@@ -19,7 +19,7 @@ on:
         required: true
         type: string
       RELEASE_REVISION:
-        required: true
+        required: false
         type: string
 
     secrets:
@@ -81,7 +81,7 @@ jobs:
       - name: Deploy to Kubernetes cluster
         uses: ConsiliumBots/kubectl-aws-eks@master
         env:
-          RELEASE_IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ inputs.ECR_REPOSITORY }}:${{ inputs.RELEASE_REVISION }}
+          RELEASE_IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ inputs.ECR_REPOSITORY }}:latest
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         with:
