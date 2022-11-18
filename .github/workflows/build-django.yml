@@ -134,7 +134,7 @@ jobs:
 
       - name: Slack ErrorGif
         if: ${{ failure() }}
-        uses: archive/github-actions-slack@v2.0.0
+        uses: archive/github-actions-slack@v2.6.0
         id: notify-bad
         with:
           slack-optional-as_user: false
@@ -153,7 +153,7 @@ jobs:
 
       - name: Slack Wiiii
         if: ${{ success() }}
-        uses: archive/github-actions-slack@v2.0.0
+        uses: archive/github-actions-slack@v2.6.0
         id: notify-wiii
         with:
           slack-optional-as_user: false
@@ -172,7 +172,7 @@ jobs:
 
       - name: Slack CancelGif
         if: ${{ cancelled() }}
-        uses: archive/github-actions-slack@v2.0.0
+        uses: archive/github-actions-slack@v2.6.0
         id: notify-canceled
         with:
           slack-optional-as_user: false
