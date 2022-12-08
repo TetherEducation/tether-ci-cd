@@ -12,6 +12,12 @@ on:
       RELEASE_REVISION:
         required: true
         type: string
+      SECRET_CONF:
+        required: false
+        type: string
+      SECRET_FILE:
+        required: false
+        type: string
 
     secrets:
       KUBE_CONFIG_DATA:
