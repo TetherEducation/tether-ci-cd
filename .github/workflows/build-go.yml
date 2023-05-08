@@ -14,7 +14,8 @@ on:
         type: string
 
 env:
-  ECR_REGISTRY: 037742176437.dkr.ecr.us-east-1.amazonaws.com
+  # ECR_REGISTRY: 037742176437.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REGISTRY: 363711807478.dkr.ecr.us-east-1.amazonaws.com
   SLACK_ICON: "[icon URL]"
   SLACK_COLOR: '#228B22'
   SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
