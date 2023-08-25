@@ -1,0 +1,66 @@
+name: Deploy to Amazon EKS
+
+on:
+  workflow_call:
+    inputs:
+      ECR_REPOSITORY:
+        required: true
+        type: string
+      KUBE_NAMESPACE:
+        required: true
+        type: string
+      DEPLOYMENT_NAME:
+        required: true
+        type: string
+      CONTAINER_APP_NAME:
+        required: true
+        type: string
+      RELEASE_REVISION:
+        required: false
+        type: string
+
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_REGION:
+        required: true
+
+env:
+  ECR_REGISTRY: 363711807478.dkr.ecr.us-east-1.amazonaws.com
+
+jobs:
+  deploy-eks:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Deploy to Kubernetes cluster
+        uses: TetherEducation/kubectl-aws-eks@master
+        env:
+          RELEASE_IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ inputs.ECR_REPOSITORY }}:${{ inputs.RELEASE_REVISION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        with:
+          args: set image deployment/${{ inputs.DEPLOYMENT_NAME }} ${{ inputs.CONTAINER_APP_NAME }}=${{ env.RELEASE_IMAGE }} -n ${{ inputs.KUBE_NAMESPACE }}
+
+      - name: Verify Kubernetes deployment
+        uses: TetherEducation/kubectl-aws-eks@master
+        with:
+          args: rollout status deployment ${{ inputs.DEPLOYMENT_NAME }} -n ${{ inputs.KUBE_NAMESPACE }}
