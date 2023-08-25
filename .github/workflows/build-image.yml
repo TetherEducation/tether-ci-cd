@@ -26,6 +26,11 @@ jobs:
     name: Build image and push to ECR
     runs-on: ubuntu-latest
     steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          access_token: ${{ github.token }}
+
       - name: Checkout
         uses: actions/checkout@v3.6.0
 
@@ -43,9 +48,9 @@ jobs:
       - name: Build and push Docker image to Amazon ECR
         id: build-image
         env:
-          ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
-          ECR_REPOSITORY: ${{ inputs.ECR_REPOSITORY }}
-          IMAGE_TAG: ${{ inputs.RELEASE_REVISION }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          RELEASE_IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ inputs.ECR_REPOSITORY }}:${{ inputs.RELEASE_REVISION }}
+          RELEASE_IMAGE_LATEST: ${{ steps.login-ecr.outputs.registry }}/${{ inputs.ECR_REPOSITORY }}:latest
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker build -t $RELEASE_IMAGE -t $RELEASE_IMAGE_LATEST .
+          docker push $RELEASE_IMAGE
