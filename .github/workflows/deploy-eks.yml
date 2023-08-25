@@ -23,6 +23,8 @@ on:
         type: string
 
     secrets:
+      KUBE_CONFIG_DATA:
+        required: true
       AWS_ACCESS_KEY_ID:
         required: true
       AWS_SECRET_ACCESS_KEY:
@@ -42,6 +44,11 @@ jobs:
         uses: styfle/cancel-workflow-action@0.11.0
         with:
           access_token: ${{ github.token }}
+
+      - name: Set env to ${{inputs.ENVIRONMENT}}
+        run: |
+          echo "KUBE_CONFIG_DATA=${{ secrets.KUBE_CONFIG_DATA }}" >> $GITHUB_ENV
+        shell: bash
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3.0.1
