@@ -22,7 +22,7 @@ env:
   SLACK_CHANNEL: github-actions
   SLACK_USERNAME: 'Dobby'
   SLACK_FOOTER: 'Powered by the House of the Elf'
-  GOPRIVATE: github.com/TetherEducation/
+  GOPRIVATE: github.com/TetherEducation/*
 
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
@@ -56,20 +56,6 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
-
-      - name: Add SSH Go Module Private Key
-        env:
-          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
-          ssh-agent -a $SSH_AUTH_SOCK > /dev/null
-          ssh-add - <<< "${{ secrets.GO_MODULE_PRIVATE_KEY }}"
-          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> $GITHUB_ENV
-
-      - name: Setup access for private go modules
-        run: |
-              git config --global url."ssh://git@github.com/".insteadOf https://github.com/
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
