@@ -23,6 +23,7 @@ env:
   SLACK_USERNAME: 'Dobby'
   SLACK_FOOTER: 'Powered by the House of the Elf'
   GOPRIVATE: github.com/TetherEducation/*
+  GH_APP_CREDENTIALS_TOKEN: ${{secrets.GH_APP_CREDENTIALS_TOKEN}}
 
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
@@ -47,7 +48,7 @@ jobs:
         run: |
           GITHUB_TOKEN="$(npx obtain-github-app-installation-access-token ci ${{ secrets.GH_APP_CREDENTIALS_TOKEN }})"
           echo "::add-mask::$GITHUB_TOKEN"
-          echo "::set-output name=token::$GITHUB_TOKEN"
+          echo "token=$GITHUB_TOKEN" >> $GITHUB_OUTPUT
 
       - name: Checkout
         uses: actions/checkout@v2
