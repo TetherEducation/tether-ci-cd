@@ -77,7 +77,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Deploy to Kubernetes cluster
-        uses: TetherEducation/kubectl-aws-eks@master
+        uses: TetherEducation/kubectl-aws-eks@staging
         env:
           RELEASE_IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ inputs.ECR_REPOSITORY }}:${{ inputs.RELEASE_REVISION }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -87,6 +87,6 @@ jobs:
           args: set image deployment/${{ inputs.DEPLOYMENT_NAME }} ${{ inputs.CONTAINER_APP_NAME }}=${{ env.RELEASE_IMAGE }} -n ${{ inputs.KUBE_NAMESPACE }}
 
       - name: Verify Kubernetes deployment
-        uses: TetherEducation/kubectl-aws-eks@master
+        uses: TetherEducation/kubectl-aws-eks@staging
         with:
           args: rollout status deployment ${{ inputs.DEPLOYMENT_NAME }} -n ${{ inputs.KUBE_NAMESPACE }}
