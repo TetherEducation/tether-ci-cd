@@ -43,6 +43,7 @@ jobs:
           fi
 
       - name: Tag the commit and push
+        id: tag-and-push
         if: steps.check-tag.outputs.SKIP_DEPLOY == 'false'
         run: |
           git config --global user.email "action@github.com"
