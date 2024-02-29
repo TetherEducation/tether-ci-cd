@@ -1,0 +1,52 @@
+name: Check and create version
+
+on:
+  workflow_call:
+    inputs:
+      TAG_POSTFIX:
+        required: true
+        type: string
+
+jobs:
+  check_tag_and_deploy:
+    name: Check Tag and Deploy
+    runs-on: ubuntu-latest
+    outputs:
+      SKIP_DEPLOY_OUTPUT: ${{ steps.check-tag.outputs.SKIP_DEPLOY }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Read version.txt and set TAG
+        id: read-version
+        run: |
+          TAG_CONTENT=$(cat version.txt)
+          echo "TAG_CONTENT=$TAG_CONTENT"
+          if [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            TAG="$TAG_CONTENT${{ env.TAG_POSTFIX }}-staging"
+          elif [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            TAG="$TAG_CONTENT${{ env.TAG_POSTFIX }}"
+          fi
+          echo "TAG=$TAG" >> $GITHUB_ENV
+
+      - name: Fetch tags
+        run: git fetch --tags
+
+      - name: Check if TAG already exists
+        id: check-tag
+        run: |
+          if git ls-remote --tags origin | grep $TAG; then
+            echo "SKIP_DEPLOY=true" >> $GITHUB_OUTPUT
+          else
+            echo "SKIP_DEPLOY=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Tag the commit and push
+        if: steps.check-tag.outputs.SKIP_DEPLOY == 'false'
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git tag $TAG
+          git push origin $TAG
+          echo "The commit has been tagged with '$TAG'"
