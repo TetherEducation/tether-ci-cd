@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       TAG_POSTFIX:
-        required: true
+        required: false
         type: string
 
 jobs:
