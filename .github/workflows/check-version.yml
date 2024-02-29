@@ -7,7 +7,8 @@ on:
         required: false
         type: string
     outputs:
-      SKIP_DEPLOY_OUTPUT: ${{ steps.check-tag-and-deploy.outputs.SKIP_DEPLOY_OUTPUT }}
+      SKIP_DEPLOY_OUTPUT:
+        value: ${{ jobs.check_tag_and_deploy.outputs.SKIP_DEPLOY_OUTPUT }}
 
 jobs:
   check_tag_and_deploy:
