@@ -19,17 +19,11 @@ on:
         required: true
         type: string
       RELEASE_REVISION:
-        required: false
+        required: true
         type: string
-      DOCKERFILE_PATH:
-        required: false
-        type: string
-        default: './Dockerfile'
 
     secrets:
       KUBE_CONFIG_DATA:
-        required: true
-      SLACK_WEBHOOK:
         required: true
       AWS_ACCESS_KEY_ID:
         required: true
@@ -40,16 +34,7 @@ on:
 
 env:
   ECR_REGISTRY: 363711807478.dkr.ecr.us-east-1.amazonaws.com
-  SLACK_ICON: "[icon URL]"
-  SLACK_COLOR: '#228B22'
-  SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-  MSG_MINIMAL: false
-  SLACK_CHANNEL: github-actions
-  SLACK_USERNAME: 'Dobby'
-  SLACK_FOOTER: 'Powered by House of the Elf'
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
-# Un despliegue por país, usar Namespace que corresponda
 jobs:
   deploy-eks:
     name: Deploy to EKS
@@ -66,7 +51,7 @@ jobs:
         shell: bash
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v3.0.1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -74,19 +59,18 @@ jobs:
 
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+        uses: aws-actions/amazon-ecr-login@v1.7.0
 
       - name: Deploy to Kubernetes cluster
-        uses: TetherEducation/kubectl-aws-eks@staging
+        uses: TetherEducation/kubectl-aws-eks@master
         env:
           RELEASE_IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ inputs.ECR_REPOSITORY }}:${{ inputs.RELEASE_REVISION }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          DOCKERFILE_PATH: ${{ inputs.DOCKERFILE_PATH }}
         with:
           args: set image deployment/${{ inputs.DEPLOYMENT_NAME }} ${{ inputs.CONTAINER_APP_NAME }}=${{ env.RELEASE_IMAGE }} -n ${{ inputs.KUBE_NAMESPACE }}
 
       - name: Verify Kubernetes deployment
-        uses: TetherEducation/kubectl-aws-eks@staging
+        uses: TetherEducation/kubectl-aws-eks@master
         with:
           args: rollout status deployment ${{ inputs.DEPLOYMENT_NAME }} -n ${{ inputs.KUBE_NAMESPACE }}
