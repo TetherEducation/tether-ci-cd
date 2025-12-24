@@ -355,7 +355,7 @@ jobs:
               "INPUT_LOGDNA_INGESTION_KEY=${{ secrets.LOGDNA_INGESTION_KEY }}" \
               "INPUT_AWS_ACCESS=${{ secrets.AWS_ACCESS_KEY_ID }}" \
               "INPUT_AWS_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
-              "INPUT_AWS_REGION=${{ secrets.AWS_DEFAULT_REGION }}" \
+              "INPUT_AWS_REGION=${{ secrets.AWS_REGION || secrets.AWS_DEFAULT_REGION }}" \
               "INPUT_GITHUB_TOKEN=${{ secrets.GH_PAT }}" \
               "INPUT_DEPLOY_REGION=default" \
               "INPUT_PROVIDER=gcp")
@@ -454,4 +454,5 @@ jobs:
           echo "**Service:** ${{ matrix.service_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Region:** ${{ matrix.region }}" >> $GITHUB_STEP_SUMMARY
           echo "**Image:** \`${IMAGE_PATH}:${{ needs.prepare.outputs.image_tag }}\`" >> $GITHUB_STEP_SUMMARY
+
 
