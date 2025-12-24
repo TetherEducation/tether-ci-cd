@@ -383,19 +383,37 @@ jobs:
           skip-extraction: false
       # ====================================================================
 
+      - name: 🔧 Prepare Docker Build Args
+        id: build_args
+        run: |
+          if [ -n "${{ inputs.docker_build_args }}" ] && [ "${{ inputs.docker_build_args }}" != "" ]; then
+            echo "Using custom docker_build_args from input"
+            BUILD_ARGS="${{ inputs.docker_build_args }}"
+          else
+            echo "Using default docker_build_args"
+            BUILD_ARGS=$(printf '%s\n' \
+              "INPUT_ENVIRONMENT=${{ inputs.environment }}" \
+              "INPUT_LOGDNA_INGESTION_KEY=${{ secrets.LOGDNA_INGESTION_KEY }}" \
+              "INPUT_AWS_ACCESS=${{ secrets.AWS_ACCESS_KEY_ID }}" \
+              "INPUT_AWS_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+              "INPUT_AWS_REGION=${{ secrets.AWS_DEFAULT_REGION }}" \
+              "INPUT_GITHUB_TOKEN=${{ secrets.GH_PAT }}" \
+              "INPUT_DEPLOY_REGION=default" \
+              "INPUT_PROVIDER=gcp")
+          fi
+          # Store in output (using delimiter to preserve newlines)
+          {
+            echo 'args<<EOF'
+            echo "$BUILD_ARGS"
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
+
       - name: 🏗️ Build and Push Docker image for ${{ matrix.image_name }}
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          build-args: ${{ inputs.docker_build_args != '' && inputs.docker_build_args || 'INPUT_ENVIRONMENT=${{ inputs.environment }}
-            INPUT_LOGDNA_INGESTION_KEY=${{ secrets.LOGDNA_INGESTION_KEY }}
-            INPUT_AWS_ACCESS=${{ secrets.AWS_ACCESS_KEY_ID }}
-            INPUT_AWS_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            INPUT_AWS_REGION=${{ secrets.AWS_DEFAULT_REGION }}
-            INPUT_GITHUB_TOKEN=${{ secrets.GH_PAT }}
-            INPUT_DEPLOY_REGION=default
-            INPUT_PROVIDER=gcp' }}
+          build-args: ${{ steps.build_args.outputs.args }}
           cache-from: |
             type=gha,scope=${{ matrix.image_name }}
             type=registry,ref=${{ needs.prepare.outputs.artifact_registry }}/${{ needs.prepare.outputs.project_id }}/${{ needs.prepare.outputs.repository }}/${{ matrix.image_name }}:cache
