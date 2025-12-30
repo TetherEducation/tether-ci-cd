@@ -1,0 +1,458 @@
+name: Deploy Explorer Docker Service
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: string
+      bootstrap_project_id:
+        description: 'Bootstrap GCP Project ID for authentication'
+        required: true
+        type: string
+      bootstrap_project_number:
+        description: 'Bootstrap GCP Project Number for Workload Identity'
+        required: true
+        type: string
+      bootstrap_workload_identity_provider:
+        description: 'Bootstrap Workload Identity Provider path'
+        required: true
+        type: string
+      bootstrap_service_account:
+        description: 'Bootstrap GitHub Actions Service Account email'
+        required: true
+        type: string
+      deployment_config_secret_name:
+        description: 'GCP Secret Manager secret name containing deployment configuration'
+        required: true
+        type: string
+      service_name:
+        description: 'Internal service name (e.g., core, users, tools-user-auth)'
+        required: true
+        type: string
+      docker_build_args:
+        description: 'Docker build arguments as multi-line string'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+  id-token: write
+  packages: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+    outputs:
+      project_id: ${{ steps.config.outputs.project_id }}
+      project_number: ${{ steps.config.outputs.project_number }}
+      artifact_registry: ${{ steps.config.outputs.artifact_registry }}
+      repository: ${{ steps.config.outputs.repository }}
+      workload_identity_provider: ${{ steps.config.outputs.workload_identity_provider }}
+      github_actions_service_account: ${{ steps.config.outputs.github_actions_service_account }}
+      image_tag: ${{ steps.tags.outputs.tag }}
+      image_matrix: ${{ steps.tags.outputs.image_matrix }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔐 Authenticate to Google Cloud (Bootstrap)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ inputs.bootstrap_workload_identity_provider }}
+          service_account: ${{ inputs.bootstrap_service_account }}
+
+      - name: ⚙️ Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          version: '502.0.0'
+          project_id: ${{ inputs.bootstrap_project_id }}
+
+      - name: 🔍 Verify Authentication
+        run: |
+          echo "=== Authentication Verification ==="
+          echo "📋 Authenticated accounts:"
+          gcloud auth list
+          echo ""
+          echo "📋 Current project: $(gcloud config get-value project)"
+          echo "📋 Service account: $(gcloud config get-value account)"
+          echo "📋 Bootstrap project ID: ${{ inputs.bootstrap_project_id }}"
+          echo "📋 Bootstrap service account: ${{ inputs.bootstrap_service_account }}"
+          echo "📋 Workload Identity Provider: ${{ inputs.bootstrap_workload_identity_provider }}"
+          echo ""
+          echo "🔐 Testing authentication..."
+          if gcloud auth print-access-token &>/dev/null; then
+            echo "✅ Successfully obtained access token"
+            TOKEN_PREFIX=$(gcloud auth print-access-token | cut -c1-20)
+            echo "   Token prefix: ${TOKEN_PREFIX}..."
+          else
+            echo "❌ Failed to obtain access token"
+            exit 1
+          fi
+
+      - name: 📦 Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: 📖 Read Deployment Configuration from Secret Manager
+        id: config
+        env:
+          SECRET_NAME: ${{ inputs.deployment_config_secret_name }}
+          BOOTSTRAP_PROJECT_ID: ${{ inputs.bootstrap_project_id }}
+          BOOTSTRAP_SERVICE_ACCOUNT: ${{ inputs.bootstrap_service_account }}
+        run: |
+          set -e
+          echo "=== Secret Access Debugging ==="
+          echo ""
+          echo "📋 Configuration:"
+          echo "   Secret Name: $SECRET_NAME"
+          echo "   Project ID: $BOOTSTRAP_PROJECT_ID"
+          echo "   Service Account: $BOOTSTRAP_SERVICE_ACCOUNT"
+          echo "   Environment: ${{ inputs.environment }}"
+          echo ""
+          
+          echo "🔍 Step 1: Verifying gcloud configuration..."
+          echo "   Current project: $(gcloud config get-value project)"
+          echo "   Current account: $(gcloud config get-value account)"
+          echo ""
+          
+          echo "🔍 Step 2: Checking service account permissions..."
+          if gcloud projects get-iam-policy "$BOOTSTRAP_PROJECT_ID" --flatten="bindings[].members" --filter="bindings.members:serviceAccount:$BOOTSTRAP_SERVICE_ACCOUNT" --format="table(bindings.role)" 2>/dev/null | grep -q "secretmanager"; then
+            echo "   ✅ Service account has Secret Manager permissions"
+            gcloud projects get-iam-policy "$BOOTSTRAP_PROJECT_ID" --flatten="bindings[].members" --filter="bindings.members:serviceAccount:$BOOTSTRAP_SERVICE_ACCOUNT" --format="table(bindings.role)" | grep secretmanager || true
+          else
+            echo "   ⚠️  Warning: Could not verify Secret Manager permissions (this may be normal if permissions are granted at secret level)"
+          fi
+          echo ""
+          
+          echo "🔍 Step 3: Checking if secret exists..."
+          if gcloud secrets describe "$SECRET_NAME" --project="$BOOTSTRAP_PROJECT_ID" &>/dev/null; then
+            echo "   ✅ Secret exists: $SECRET_NAME"
+            echo "   Secret details:"
+            gcloud secrets describe "$SECRET_NAME" --project="$BOOTSTRAP_PROJECT_ID" --format="yaml(name,createTime,labels)" || true
+          else
+            SECRET_ERROR=$(gcloud secrets describe "$SECRET_NAME" --project="$BOOTSTRAP_PROJECT_ID" 2>&1 || true)
+            echo "   ❌ Error accessing secret: $SECRET_NAME"
+            echo "   Error details: $SECRET_ERROR"
+            echo ""
+            echo "   Troubleshooting steps:"
+            echo "   1. Verify the secret name is correct: $SECRET_NAME"
+            echo "   2. Verify the secret exists in project: $BOOTSTRAP_PROJECT_ID"
+            echo "   3. Verify service account $BOOTSTRAP_SERVICE_ACCOUNT has 'Secret Manager Secret Accessor' role"
+            echo "   4. Verify Workload Identity Federation is properly configured"
+            echo "   5. Check if the secret has IAM bindings that allow this service account"
+            exit 1
+          fi
+          echo ""
+          
+          echo "🔍 Step 4: Reading secret content..."
+          echo "   Command: gcloud secrets versions access latest --secret=\"$SECRET_NAME\" --project=\"$BOOTSTRAP_PROJECT_ID\""
+          if CONFIG_JSON=$(gcloud secrets versions access latest \
+            --secret="$SECRET_NAME" \
+            --project="$BOOTSTRAP_PROJECT_ID" 2>&1); then
+            echo "   ✅ Successfully read secret"
+            CONFIG_SIZE=$(echo "$CONFIG_JSON" | wc -c)
+            echo "   Secret size: $CONFIG_SIZE bytes"
+            
+            # Validate JSON
+            if echo "$CONFIG_JSON" | jq empty 2>/dev/null; then
+              echo "   ✅ Secret contains valid JSON"
+            else
+              echo "   ❌ Error: Secret does not contain valid JSON"
+              echo "   First 200 characters: $(echo "$CONFIG_JSON" | head -c 200)"
+              exit 1
+            fi
+          else
+            READ_ERROR="$CONFIG_JSON"
+            echo "   ❌ Error reading secret content"
+            echo "   Error: $READ_ERROR"
+            echo ""
+            echo "   Common issues:"
+            echo "   - Service account lacks 'Secret Manager Secret Accessor' role"
+            echo "   - Secret version is disabled or destroyed"
+            echo "   - Network/firewall issues"
+            exit 1
+          fi
+          echo ""
+          
+          echo "🔍 Step 5: Parsing configuration..."
+          # Extract values using jq with error handling
+          PROJECT_ID=$(echo "$CONFIG_JSON" | jq -r '.project_id // empty')
+          PROJECT_NUMBER=$(echo "$CONFIG_JSON" | jq -r '.project_number // empty')
+          ARTIFACT_REGISTRY_HOST=$(echo "$CONFIG_JSON" | jq -r '.artifact_registry_host // empty')
+          ARTIFACT_REGISTRY_REPOSITORY=$(echo "$CONFIG_JSON" | jq -r '.artifact_registry_repository // empty')
+          WORKLOAD_IDENTITY_PROVIDER=$(echo "$CONFIG_JSON" | jq -r '.workload_identity_provider // empty')
+          GITHUB_ACTIONS_SERVICE_ACCOUNT=$(echo "$CONFIG_JSON" | jq -r '.github_actions_service_account // empty')
+          REGIONS=$(echo "$CONFIG_JSON" | jq -r '.regions // empty')
+          INFRASTRUCTURE=$(echo "$CONFIG_JSON" | jq -r '.infrastructure // empty')
+          
+          echo "   Parsed values:"
+          echo "   - project_id: ${PROJECT_ID:-❌ MISSING}"
+          echo "   - project_number: ${PROJECT_NUMBER:-❌ MISSING}"
+          echo "   - artifact_registry_host: ${ARTIFACT_REGISTRY_HOST:-❌ MISSING}"
+          echo "   - artifact_registry_repository: ${ARTIFACT_REGISTRY_REPOSITORY:-❌ MISSING}"
+          echo "   - workload_identity_provider: ${WORKLOAD_IDENTITY_PROVIDER:-❌ MISSING}"
+          echo "   - github_actions_service_account: ${GITHUB_ACTIONS_SERVICE_ACCOUNT:-❌ MISSING}"
+          echo "   - regions: ${REGIONS:-❌ MISSING}"
+          
+          if [ -z "$PROJECT_ID" ] || [ -z "$PROJECT_NUMBER" ] || [ -z "$ARTIFACT_REGISTRY_HOST" ] || [ -z "$ARTIFACT_REGISTRY_REPOSITORY" ]; then
+            echo ""
+            echo "   ❌ Error: Required fields are missing from deployment config"
+            echo "   Full config structure:"
+            echo "$CONFIG_JSON" | jq '.' | head -50
+            exit 1
+          fi
+          
+          if [ "$REGIONS" = "null" ] || [ -z "$REGIONS" ]; then
+            echo ""
+            echo "   ❌ Error: 'regions' array is missing or empty in deployment config"
+            exit 1
+          fi
+          
+          if [ "$INFRASTRUCTURE" = "null" ] || [ -z "$INFRASTRUCTURE" ]; then
+            echo ""
+            echo "   ❌ Error: 'infrastructure' object is missing in deployment config"
+            exit 1
+          fi
+          
+          REGIONS_COUNT=$(echo "$CONFIG_JSON" | jq -r '.regions | length // 0')
+          if [ "$REGIONS_COUNT" -eq 0 ]; then
+            echo ""
+            echo "   ❌ Error: No regions defined in deployment config"
+            exit 1
+          fi
+          
+          echo ""
+          echo "   Regions configuration:"
+          SERVICE_NAME_PARAM="${{ inputs.service_name }}"
+          echo "$CONFIG_JSON" | jq -r '.regions[]' | while read -r region_key; do
+            SERVICE_NAME=$(echo "$CONFIG_JSON" | jq -r ".infrastructure.\"$region_key\".services[\"$SERVICE_NAME_PARAM\"].service_name // \"not set\"")
+            REGION=$(echo "$CONFIG_JSON" | jq -r ".infrastructure.\"$region_key\".region // \"not set\"")
+            IMAGE_NAME=$(echo "$CONFIG_JSON" | jq -r ".infrastructure.\"$region_key\".services[\"$SERVICE_NAME_PARAM\"].image_name // \"not set\"")
+            echo "   - $region_key: $SERVICE_NAME in $REGION (image: $IMAGE_NAME)"
+          done
+          echo ""
+          
+          # Set outputs
+          echo "project_id=$PROJECT_ID" >> $GITHUB_OUTPUT
+          echo "project_number=$PROJECT_NUMBER" >> $GITHUB_OUTPUT
+          echo "artifact_registry=$ARTIFACT_REGISTRY_HOST" >> $GITHUB_OUTPUT
+          echo "repository=$ARTIFACT_REGISTRY_REPOSITORY" >> $GITHUB_OUTPUT
+          echo "workload_identity_provider=$WORKLOAD_IDENTITY_PROVIDER" >> $GITHUB_OUTPUT
+          echo "github_actions_service_account=$GITHUB_ACTIONS_SERVICE_ACCOUNT" >> $GITHUB_OUTPUT
+          
+          # Store full JSON for later use
+          echo "$CONFIG_JSON" > /tmp/deployment-config.json
+          echo "✅ Configuration successfully parsed and stored"
+
+      - name: 🏷️ Generate image tags
+        id: tags
+        run: |
+          IMAGE_TAG="${GITHUB_SHA:0:7}"
+          echo "tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+          # Extract unique image_name values from all regions
+          echo "🔍 Extracting unique image names from all regions..."
+          SERVICE_NAME_PARAM="${{ inputs.service_name }}"
+          IMAGE_MATRIX=$(cat /tmp/deployment-config.json | jq -c --arg service_name "$SERVICE_NAME_PARAM" '[.regions[] as $region_key | .infrastructure[$region_key].services[$service_name].image_name] | unique | map({image_name: .})')
+          IMAGE_MATRIX_COUNT=$(echo "$IMAGE_MATRIX" | jq 'length')
+          
+          echo "✅ Found $IMAGE_MATRIX_COUNT unique image(s):"
+          echo "$IMAGE_MATRIX" | jq -r '.[] | "   - \(.image_name)"'
+          
+          # Export image matrix
+          echo "image_matrix=$IMAGE_MATRIX" >> $GITHUB_OUTPUT
+
+      - name: 🔨 Build Deployment Matrix
+        id: matrix
+        run: |
+          # Build matrix from regions array and infrastructure object
+          SERVICE_NAME_PARAM="${{ inputs.service_name }}"
+          MATRIX=$(cat /tmp/deployment-config.json | jq -c --arg service_name "$SERVICE_NAME_PARAM" '[.regions[] as $region_key | {
+            label: $region_key,
+            service_name: .infrastructure[$region_key].services[$service_name].service_name,
+            region: .infrastructure[$region_key].region,
+            image_name: .infrastructure[$region_key].services[$service_name].image_name
+          }]')
+          
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "Built matrix with $(echo "$MATRIX" | jq 'length') regions:"
+          echo "$MATRIX" | jq -r '.[] | "  - \(.label): \(.service_name) in \(.region) (image: \(.image_name))"'
+          
+          # Validate that all required fields exist
+          MISSING_SERVICE=$(echo "$MATRIX" | jq -r '.[] | select(.service_name == null or .service_name == "") | .label')
+          MISSING_REGION=$(echo "$MATRIX" | jq -r '.[] | select(.region == null or .region == "") | .label')
+          MISSING_IMAGE=$(echo "$MATRIX" | jq -r '.[] | select(.image_name == null or .image_name == "") | .label')
+          
+          if [ -n "$MISSING_SERVICE" ]; then
+            echo "❌ Error: Some regions are missing $SERVICE_NAME_PARAM service:"
+            echo "$MISSING_SERVICE"
+            exit 1
+          fi
+          
+          if [ -n "$MISSING_REGION" ]; then
+            echo "❌ Error: Some regions are missing GCP region:"
+            echo "$MISSING_REGION"
+            exit 1
+          fi
+          
+          if [ -n "$MISSING_IMAGE" ]; then
+            echo "❌ Error: Some regions are missing image_name:"
+            echo "$MISSING_IMAGE"
+            exit 1
+          fi
+
+  build:
+    needs: prepare
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.prepare.outputs.image_matrix) }}
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔐 Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ needs.prepare.outputs.workload_identity_provider }}
+          service_account: ${{ needs.prepare.outputs.github_actions_service_account }}
+
+      - name: ⚙️ Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          version: '502.0.0'
+
+      - name: 🔑 Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ needs.prepare.outputs.artifact_registry }}
+
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔧 Prepare Docker Build Args
+        id: build_args
+        run: |
+          if [ -n "${{ inputs.docker_build_args }}" ] && [ "${{ inputs.docker_build_args }}" != "" ]; then
+            echo "Using custom docker_build_args from input"
+            BUILD_ARGS="${{ inputs.docker_build_args }}"
+          else
+            echo "Using default docker_build_args"
+            BUILD_ARGS=$(printf '%s\n' \
+              "INPUT_ENVIRONMENT=${{ inputs.environment }}" \
+              "INPUT_LOGDNA_INGESTION_KEY=${{ secrets.LOGDNA_INGESTION_KEY }}" \
+              "INPUT_AWS_ACCESS=${{ secrets.AWS_ACCESS_KEY_ID }}" \
+              "INPUT_AWS_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+              "INPUT_AWS_REGION=${{ secrets.AWS_REGION || secrets.AWS_DEFAULT_REGION }}" \
+              "INPUT_GITHUB_TOKEN=${{ secrets.GH_PAT }}" \
+              "INPUT_DEPLOY_REGION=default" \
+              "INPUT_PROVIDER=gcp")
+          fi
+          # Store in output (using delimiter to preserve newlines)
+          {
+            echo 'args<<EOF'
+            echo "$BUILD_ARGS"
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
+
+      - name: 🏗️ Build and Push Docker image for ${{ matrix.image_name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: ${{ steps.build_args.outputs.args }}
+          cache-from: |
+            type=gha,scope=${{ matrix.image_name }}
+            type=registry,ref=${{ needs.prepare.outputs.artifact_registry }}/${{ needs.prepare.outputs.project_id }}/${{ needs.prepare.outputs.repository }}/${{ matrix.image_name }}:cache
+          cache-to: |
+            type=gha,scope=${{ matrix.image_name }},mode=max
+            type=registry,ref=${{ needs.prepare.outputs.artifact_registry }}/${{ needs.prepare.outputs.project_id }}/${{ needs.prepare.outputs.repository }}/${{ matrix.image_name }}:cache,mode=max,oci-mediatypes=true
+          tags: |
+            ${{ needs.prepare.outputs.artifact_registry }}/${{ needs.prepare.outputs.project_id }}/${{ needs.prepare.outputs.repository }}/${{ matrix.image_name }}:${{ needs.prepare.outputs.image_tag }}
+            ${{ needs.prepare.outputs.artifact_registry }}/${{ needs.prepare.outputs.project_id }}/${{ needs.prepare.outputs.repository }}/${{ matrix.image_name }}:latest
+            ${{ needs.prepare.outputs.artifact_registry }}/${{ needs.prepare.outputs.project_id }}/${{ needs.prepare.outputs.repository }}/${{ matrix.image_name }}:${{ inputs.environment }}-latest
+
+  deploy:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    steps:
+      - name: 🔐 Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ needs.prepare.outputs.workload_identity_provider }}
+          service_account: ${{ needs.prepare.outputs.github_actions_service_account }}
+
+      - name: ⚙️ Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          version: '502.0.0'
+
+      - name: 🚀 Deploy ${{ matrix.service_name }} to ${{ matrix.region }}
+        run: |
+          echo "Deploying ${{ matrix.service_name }} to region ${{ matrix.region }}"
+          echo "Label: ${{ matrix.label }}"
+          
+          # Reuse variables from prepare job
+          PROJECT_ID="${{ needs.prepare.outputs.project_id }}"
+          PROJECT_NUMBER="${{ needs.prepare.outputs.project_number }}"
+          ARTIFACT_REGISTRY_HOST="${{ needs.prepare.outputs.artifact_registry }}"
+          ARTIFACT_REGISTRY_REPOSITORY="${{ needs.prepare.outputs.repository }}"
+          IMAGE_TAG="${{ needs.prepare.outputs.image_tag }}"
+          
+          # Use image_name from service matrix
+          echo "Using image from service matrix: ${{ matrix.image_name }}"
+          
+          # Construct image path using image_name from service matrix
+          IMAGE="${ARTIFACT_REGISTRY_HOST}/${PROJECT_ID}/${ARTIFACT_REGISTRY_REPOSITORY}/${{ matrix.image_name }}"
+          
+          # Determine DEPLOY_REGION based on label
+          if [ "${{ matrix.label }}" = "europe" ] || [ "${{ matrix.label }}" = "eu" ]; then
+            DEPLOY_REGION="europe"
+          else
+            DEPLOY_REGION="default"
+          fi
+          
+          # Build env vars string (only update what's needed, preserve existing Cloud Run vars like K_SERVICE, K_REVISION, PORT, GOOGLE_CLOUD_PROJECT)
+          # Use environment variables for entrypoint configuration (ENTRYPOINT_MODE, ENTRYPOINT_PROVIDER)
+          ENV_VARS="GOOGLE_CLOUD_PROJECT_NUMBER=$PROJECT_NUMBER,GOOGLE_CLOUD_PROJECT_ID=$PROJECT_ID,DEPLOY_REGION=$DEPLOY_REGION,ENTRYPOINT_MODE=serve,ENTRYPOINT_PROVIDER=gcp"
+          
+          gcloud run services update "${{ matrix.service_name }}" \
+            --image "$IMAGE:$IMAGE_TAG" \
+            --region "${{ matrix.region }}" \
+            --project "$PROJECT_ID" \
+            --update-env-vars "$ENV_VARS"
+
+      - name: 📊 Deployment Summary for ${{ matrix.label }}
+        run: |
+          ARTIFACT_REGISTRY_HOST="${{ needs.prepare.outputs.artifact_registry }}"
+          PROJECT_ID="${{ needs.prepare.outputs.project_id }}"
+          ARTIFACT_REGISTRY_REPOSITORY="${{ needs.prepare.outputs.repository }}"
+          IMAGE_PATH="${ARTIFACT_REGISTRY_HOST}/${PROJECT_ID}/${ARTIFACT_REGISTRY_REPOSITORY}/${{ matrix.image_name }}"
+          
+          echo "### 🚀 Cloud Run Deployment - ${{ matrix.label }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Service:** ${{ matrix.service_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Region:** ${{ matrix.region }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${IMAGE_PATH}:${{ needs.prepare.outputs.image_tag }}\`" >> $GITHUB_STEP_SUMMARY
+
+
