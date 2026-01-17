@@ -35,8 +35,8 @@ on:
         description: 'Job key for migrations (e.g., core-run-migrations, users-run-migrations)'
         required: true
         type: string
-      run_migrations:
-        description: 'For workflow_dispatch: Whether to run migrations. For PRs, migrations run automatically if migration files are detected.'
+      force_migrations:
+        description: 'Force migrations to run even if no migration files are detected. If false, migrations run automatically when migration files are detected.'
         required: false
         type: boolean
         default: false
@@ -484,29 +484,24 @@ jobs:
       - name: 🔍 Determine if Migrations Should Run
         id: decide
         run: |
-          # Check if this is a PR context (workflow_call triggered from PR)
-          # For PRs, use file detection result from previous step
-          # For workflow_dispatch, use the run_migrations input parameter
+          # Check force_migrations first - if true, always run migrations
+          if [ "${{ inputs.force_migrations }}" = "true" ]; then
+            echo "✅ force_migrations=true - migrations will run (forced)"
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
           
-          if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
-            # PR context: use file detection result
-            MIGRATIONS_DETECTED="${{ steps.check_migrations.outputs.has_migrations }}"
-            if [ "$MIGRATIONS_DETECTED" = "true" ]; then
-              echo "✅ PR context: Migration files detected - migrations will run"
-              echo "should_run=true" >> $GITHUB_OUTPUT
-            else
-              echo "⏭️ PR context: No migration files detected - migrations will be skipped"
-              echo "should_run=false" >> $GITHUB_OUTPUT
-            fi
+          # Check if migration files were detected
+          MIGRATIONS_DETECTED="${{ steps.check_migrations.outputs.has_migrations }}"
+          
+          if [ "$MIGRATIONS_DETECTED" = "true" ]; then
+            # Migration files detected - run migrations
+            echo "✅ Migration files detected - migrations will run"
+            echo "should_run=true" >> $GITHUB_OUTPUT
           else
-            # workflow_dispatch context: use input parameter
-            if [ "${{ inputs.run_migrations }}" = "true" ]; then
-              echo "✅ workflow_dispatch: run_migrations=true - migrations will run"
-              echo "should_run=true" >> $GITHUB_OUTPUT
-            else
-              echo "⏭️ workflow_dispatch: run_migrations=false - migrations will be skipped"
-              echo "should_run=false" >> $GITHUB_OUTPUT
-            fi
+            # No migration files detected and force_migrations is false - skip migrations
+            echo "⏭️ No migration files detected and force_migrations=false - migrations will be skipped"
+            echo "should_run=false" >> $GITHUB_OUTPUT
           fi
 
   migrate:
