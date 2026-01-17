@@ -424,7 +424,7 @@ jobs:
             ${{ needs.prepare.outputs.artifact_registry }}/${{ needs.prepare.outputs.project_id }}/${{ needs.prepare.outputs.repository }}/${{ matrix.image_name }}:latest
             ${{ needs.prepare.outputs.artifact_registry }}/${{ needs.prepare.outputs.project_id }}/${{ needs.prepare.outputs.repository }}/${{ matrix.image_name }}:${{ inputs.environment }}-latest
 
-  label-migrations:
+  check-migrations:
     needs: [prepare]
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
@@ -432,6 +432,7 @@ jobs:
       contents: read
     outputs:
       has_migrations: ${{ steps.check_migrations.outputs.has_migrations }}
+      should_run: ${{ steps.decide.outputs.should_run }}
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
@@ -480,22 +481,16 @@ jobs:
             echo "has_migrations=false" >> $GITHUB_OUTPUT
           fi
 
-  check-migrations:
-    needs: [prepare, label-migrations]
-    runs-on: ubuntu-latest
-    outputs:
-      should_run: ${{ steps.decide.outputs.should_run }}
-    steps:
       - name: 🔍 Determine if Migrations Should Run
         id: decide
         run: |
           # Check if this is a PR context (workflow_call triggered from PR)
-          # For PRs, use file detection from label-migrations job
+          # For PRs, use file detection result from previous step
           # For workflow_dispatch, use the run_migrations input parameter
           
           if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
             # PR context: use file detection result
-            MIGRATIONS_DETECTED="${{ needs.label-migrations.outputs.has_migrations }}"
+            MIGRATIONS_DETECTED="${{ steps.check_migrations.outputs.has_migrations }}"
             if [ "$MIGRATIONS_DETECTED" = "true" ]; then
               echo "✅ PR context: Migration files detected - migrations will run"
               echo "should_run=true" >> $GITHUB_OUTPUT
@@ -515,7 +510,7 @@ jobs:
           fi
 
   migrate:
-    needs: [prepare, build, label-migrations, check-migrations]
+    needs: [prepare, build, check-migrations]
     if: needs.check-migrations.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
@@ -574,6 +569,7 @@ jobs:
 
   deploy:
     needs: [prepare, build, migrate]
+    if: always() && needs.prepare.result == 'success' && needs.build.result == 'success' && (needs.migrate.result == 'success' || needs.migrate.result == 'skipped')
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     permissions:
