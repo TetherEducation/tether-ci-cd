@@ -35,8 +35,8 @@ on:
         description: 'Job key for migrations (e.g., core-run-migrations, users-run-migrations)'
         required: true
         type: string
-      migrations_require_label:
-        description: 'If true, migrations only run when migration label is present. If false, migrations run based on file detection.'
+      force_migrations:
+        description: 'Force migrations to run even if no migration files are detected. If false, migrations run automatically when migration files are detected.'
         required: false
         type: boolean
         default: false
@@ -50,7 +50,6 @@ permissions:
   contents: read
   id-token: write
   packages: read
-  pull-requests: write
 
 jobs:
   prepare:
@@ -425,14 +424,15 @@ jobs:
             ${{ needs.prepare.outputs.artifact_registry }}/${{ needs.prepare.outputs.project_id }}/${{ needs.prepare.outputs.repository }}/${{ matrix.image_name }}:latest
             ${{ needs.prepare.outputs.artifact_registry }}/${{ needs.prepare.outputs.project_id }}/${{ needs.prepare.outputs.repository }}/${{ matrix.image_name }}:${{ inputs.environment }}-latest
 
-  label-migrations:
+  check-migrations:
     needs: [prepare]
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     permissions:
       contents: read
-      pull-requests: write
-      issues: write
+    outputs:
+      has_migrations: ${{ steps.check_migrations.outputs.has_migrations }}
+      should_run: ${{ steps.decide.outputs.should_run }}
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
@@ -447,10 +447,12 @@ jobs:
           echo "Event name: ${{ github.event_name }}"
           
           # Determine the base reference for comparison
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
+          # For PR context, check if we can access PR information
+          if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
             BASE_REF="${{ github.event.pull_request.base.sha }}"
             echo "Comparing against PR base: $BASE_REF"
           else
+            # For non-PR events (workflow_dispatch, push, etc.), compare against previous commit
             BASE_REF=$(git rev-parse "$GITHUB_SHA^" 2>/dev/null || echo "")
             if [ -z "$BASE_REF" ]; then
               echo "No parent commit found, checking if migrations exist in current commit"
@@ -479,32 +481,38 @@ jobs:
             echo "has_migrations=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: 🏷️ Add Migration Label to PR
-        if: steps.check_migrations.outputs.has_migrations == 'true' && github.event_name == 'pull_request'
-        uses: actions/labeler@v6
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          configuration-path: .github/migration-labeler.yml
-          sync-labels: false
-
-      - name: 🏷️ Set Migration Label Output
-        id: set_label_output
+      - name: 🔍 Determine if Migrations Should Run
+        id: decide
         run: |
-          if [ "${{ steps.check_migrations.outputs.has_migrations }}" = "true" ]; then
-            echo "has_migrations_label=true" >> $GITHUB_OUTPUT
+          # Check force_migrations first - if true, always run migrations
+          if [ "${{ inputs.force_migrations }}" = "true" ]; then
+            echo "✅ force_migrations=true - migrations will run (forced)"
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Check if migration files were detected
+          MIGRATIONS_DETECTED="${{ steps.check_migrations.outputs.has_migrations }}"
+          
+          if [ "$MIGRATIONS_DETECTED" = "true" ]; then
+            # Migration files detected - run migrations
+            echo "✅ Migration files detected - migrations will run"
+            echo "should_run=true" >> $GITHUB_OUTPUT
           else
-            echo "has_migrations_label=false" >> $GITHUB_OUTPUT
+            # No migration files detected and force_migrations is false - skip migrations
+            echo "⏭️ No migration files detected and force_migrations=false - migrations will be skipped"
+            echo "should_run=false" >> $GITHUB_OUTPUT
           fi
 
   migrate:
-    needs: [prepare, build, label-migrations]
+    needs: [prepare, build, check-migrations]
+    if: needs.check-migrations.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     permissions:
       contents: read
       id-token: write
       packages: read
-      pull-requests: read
     strategy:
       matrix:
         include: ${{ fromJson(needs.prepare.outputs.matrix) }}
@@ -525,88 +533,7 @@ jobs:
         with:
           version: '502.0.0'
 
-      - name: 🔍 Check Migration Label on PR
-        id: check_label
-        if: inputs.migrations_require_label == true && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const labelName = 'migrations';
-            const prNumber = context.payload.pull_request.number;
-            
-            try {
-              const { data: labels } = await github.rest.issues.listLabelsOnIssue({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber
-              });
-              
-              const hasLabel = labels.some(label => label.name === labelName);
-              core.setOutput('has_label', hasLabel.toString());
-              
-              if (hasLabel) {
-                console.log(`✅ Migration label "${labelName}" found on PR #${prNumber}`);
-              } else {
-                console.log(`ℹ️ Migration label "${labelName}" not found on PR #${prNumber}`);
-              }
-            } catch (error) {
-              console.error(`❌ Error checking label: ${error.message}`);
-              core.setOutput('has_label', 'false');
-            }
-
-      - name: 🔍 Set Default Label Check Output
-        id: default_label_check
-        if: inputs.migrations_require_label != true || github.event_name != 'pull_request'
-        run: |
-          echo "has_label=false" >> $GITHUB_OUTPUT
-
-      - name: 🔍 Determine if Migrations Should Run
-        id: should_run_migrations
-        env:
-          LABEL_CHECK_HAS_LABEL: ${{ steps.check_label.outputs.has_label }}
-          DEFAULT_LABEL_CHECK_HAS_LABEL: ${{ steps.default_label_check.outputs.has_label }}
-          MIGRATIONS_LABEL_DETECTED: ${{ needs.label-migrations.outputs.has_migrations_label }}
-        run: |
-          # Get label check result (defaults to false if step didn't run)
-          LABEL_CHECK_RESULT="${LABEL_CHECK_HAS_LABEL:-${DEFAULT_LABEL_CHECK_HAS_LABEL:-false}}"
-          # Get migration detection result from label-migrations job
-          MIGRATIONS_DETECTED="${MIGRATIONS_LABEL_DETECTED:-false}"
-          
-          if [ "${{ inputs.migrations_require_label }}" = "true" ]; then
-            echo "🔍 Label-based migration control is ENABLED"
-            if [ "${{ github.event_name }}" = "pull_request" ]; then
-              # For PRs, check if label is present
-              if [ "$LABEL_CHECK_RESULT" = "true" ]; then
-                echo "✅ Migration label found - migrations will run"
-                echo "should_run=true" >> $GITHUB_OUTPUT
-              else
-                echo "⏭️ Migration label not found - migrations will be skipped"
-                echo "should_run=false" >> $GITHUB_OUTPUT
-              fi
-            else
-              # For non-PR events, use output from label-migrations job
-              if [ "$MIGRATIONS_DETECTED" = "true" ]; then
-                echo "✅ Migration changes detected - migrations will run"
-                echo "should_run=true" >> $GITHUB_OUTPUT
-              else
-                echo "⏭️ No migration changes detected - migrations will be skipped"
-                echo "should_run=false" >> $GITHUB_OUTPUT
-              fi
-            fi
-          else
-            echo "🔍 Label-based migration control is DISABLED - using file detection"
-            # Use file detection from label-migrations job
-            if [ "$MIGRATIONS_DETECTED" = "true" ]; then
-              echo "✅ Migration files changed - migrations will run"
-              echo "should_run=true" >> $GITHUB_OUTPUT
-            else
-              echo "⏭️ No migration files changed - migrations will be skipped"
-              echo "should_run=false" >> $GITHUB_OUTPUT
-            fi
-          fi
-
       - name: 🗄️ Run Database Migrations for ${{ matrix.label }}
-        if: steps.should_run_migrations.outputs.should_run == 'true'
         run: |
           echo "Running migrations for region: ${{ matrix.region }}, label: ${{ matrix.label }}"
           
@@ -635,17 +562,9 @@ jobs:
           
           echo "✅ Migrations completed successfully for ${{ matrix.label }}"
 
-      - name: ⏭️ Skip Migrations
-        if: steps.should_run_migrations.outputs.should_run == 'false'
-        run: |
-          if [ "${{ inputs.migrations_require_label }}" = "true" ]; then
-            echo "⏭️ Skipping migrations - migration label not present (label-based control enabled)"
-          else
-            echo "⏭️ Skipping migrations - no migration files changed"
-          fi
-
   deploy:
     needs: [prepare, build, migrate]
+    if: always() && needs.prepare.result == 'success' && needs.build.result == 'success' && (needs.migrate.result == 'success' || needs.migrate.result == 'skipped')
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     permissions:
