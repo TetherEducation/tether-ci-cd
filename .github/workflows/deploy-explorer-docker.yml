@@ -433,8 +433,8 @@ jobs:
           fi
           
           # Build env vars string (only update what's needed, preserve existing Cloud Run vars like K_SERVICE, K_REVISION, PORT, GOOGLE_CLOUD_PROJECT)
-          # Use environment variables for entrypoint configuration (ENTRYPOINT_MODE, ENTRYPOINT_PROVIDER)
-          ENV_VARS="GOOGLE_CLOUD_PROJECT_NUMBER=$PROJECT_NUMBER,GOOGLE_CLOUD_PROJECT_ID=$PROJECT_ID,DEPLOY_REGION=$DEPLOY_REGION,ENTRYPOINT_MODE=serve,ENTRYPOINT_PROVIDER=gcp"
+          # Use environment variables for entrypoint configuration (ENTRYPOINT_PROVIDER)
+          ENV_VARS="GOOGLE_CLOUD_PROJECT_NUMBER=$PROJECT_NUMBER,GOOGLE_CLOUD_PROJECT_ID=$PROJECT_ID,DEPLOY_REGION=$DEPLOY_REGION,ENTRYPOINT_PROVIDER=gcp"
           
           gcloud run services update "${{ matrix.service_name }}" \
             --image "$IMAGE:$IMAGE_TAG" \
