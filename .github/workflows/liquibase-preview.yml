@@ -167,6 +167,21 @@ jobs:
           path: preview-output.txt
           retention-days: 7
 
+      - name: Set Slack mention
+        id: mention
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+        run: |
+          # Leer mapeo desde JSON centralizado
+          SLACK_MAP=$(curl -s "https://raw.githubusercontent.com/TetherEducation/tether-ci-cd/staging/config/slack-users.json")
+          SLACK_ID=$(echo "$SLACK_MAP" | jq -r --arg user "$GITHUB_ACTOR" '.[$user] // empty')
+
+          if [ -n "$SLACK_ID" ]; then
+            echo "text=<@$SLACK_ID>" >> $GITHUB_OUTPUT
+          else
+            echo "text=@$GITHUB_ACTOR" >> $GITHUB_OUTPUT
+          fi
+
       - name: Notify Slack - Preview Ready
         if: steps.logs.outputs.has_changes == 'true'
         uses: slackapi/slack-github-action@v2.0.0
@@ -183,7 +198,7 @@ jobs:
                       "type": "header",
                       "text": {
                         "type": "plain_text",
-                        "text": "🔍 Migration Preview Ready",
+                        "text": "🔍 Liquibase Preview - Cambios Detectados",
                         "emoji": true
                       }
                     },
@@ -196,15 +211,15 @@ jobs:
                         },
                         {
                           "type": "mrkdwn",
-                          "text": "*Triggered by:*\n@${{ github.actor }}"
+                          "text": "*Triggered by:*\n${{ steps.mention.outputs.text }}"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Preview Run ID:*\n`${{ github.run_id }}`"
                         },
                         {
                           "type": "mrkdwn",
                           "text": "*Repo:*\n<${{ github.server_url }}/${{ github.repository }}|${{ github.repository }}>"
-                        },
-                        {
-                          "type": "mrkdwn",
-                          "text": "*Commit:*\n`${{ github.sha }}`"
                         }
                       ]
                     },
@@ -213,7 +228,7 @@ jobs:
                       "elements": [
                         {
                           "type": "mrkdwn",
-                          "text": "⏳ Review SQL and use *Preview Run ID:* `${{ github.run_id }}` to apply"
+                          "text": "⏳ Revisa el SQL y usa el *Preview Run ID* de arriba para aplicar"
                         }
                       ]
                     },
@@ -259,11 +274,47 @@ jobs:
                   "color": "#6c757d",
                   "blocks": [
                     {
-                      "type": "section",
+                      "type": "header",
                       "text": {
-                        "type": "mrkdwn",
-                        "text": "ℹ️ *No pending migrations* for `${{ inputs.database_name }}`\nTriggered by @${{ github.actor }}"
+                        "type": "plain_text",
+                        "text": "ℹ️ Liquibase Preview - Sin Cambios",
+                        "emoji": true
                       }
+                    },
+                    {
+                      "type": "section",
+                      "fields": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Database:*\n`${{ inputs.database_name }}`"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Triggered by:*\n${{ steps.mention.outputs.text }}"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Preview Run ID:*\n`${{ github.run_id }}`"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Estado:*\nNo hay migraciones pendientes"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "actions",
+                      "elements": [
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "📋 Ver Logs",
+                            "emoji": true
+                          },
+                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                        }
+                      ]
                     }
                   ]
                 }

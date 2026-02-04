@@ -180,6 +180,19 @@ jobs:
     if: success()
     runs-on: ubuntu-latest
     steps:
+      - name: Set Slack mention
+        id: mention
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+        run: |
+          SLACK_MAP=$(curl -s "https://raw.githubusercontent.com/TetherEducation/tether-ci-cd/staging/config/slack-users.json")
+          SLACK_ID=$(echo "$SLACK_MAP" | jq -r --arg user "$GITHUB_ACTOR" '.[$user] // empty')
+          if [ -n "$SLACK_ID" ]; then
+            echo "text=<@$SLACK_ID>" >> $GITHUB_OUTPUT
+          else
+            echo "text=@$GITHUB_ACTOR" >> $GITHUB_OUTPUT
+          fi
+
       - name: Notify Slack - Success
         uses: slackapi/slack-github-action@v2.0.0
         with:
@@ -195,7 +208,7 @@ jobs:
                       "type": "header",
                       "text": {
                         "type": "plain_text",
-                        "text": "✅ Migration Completed",
+                        "text": "✅ Liquibase Apply - Completado",
                         "emoji": true
                       }
                     },
@@ -208,7 +221,7 @@ jobs:
                         },
                         {
                           "type": "mrkdwn",
-                          "text": "*Applied by:*\n@${{ github.actor }}"
+                          "text": "*Applied by:*\n${{ steps.mention.outputs.text }}"
                         }
                       ]
                     },
@@ -231,6 +244,19 @@ jobs:
     if: failure()
     runs-on: ubuntu-latest
     steps:
+      - name: Set Slack mention
+        id: mention
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+        run: |
+          SLACK_MAP=$(curl -s "https://raw.githubusercontent.com/TetherEducation/tether-ci-cd/staging/config/slack-users.json")
+          SLACK_ID=$(echo "$SLACK_MAP" | jq -r --arg user "$GITHUB_ACTOR" '.[$user] // empty')
+          if [ -n "$SLACK_ID" ]; then
+            echo "text=<@$SLACK_ID>" >> $GITHUB_OUTPUT
+          else
+            echo "text=@$GITHUB_ACTOR" >> $GITHUB_OUTPUT
+          fi
+
       - name: Notify Slack - Failure
         uses: slackapi/slack-github-action@v2.0.0
         with:
@@ -246,7 +272,7 @@ jobs:
                       "type": "header",
                       "text": {
                         "type": "plain_text",
-                        "text": "❌ Migration Failed",
+                        "text": "❌ Liquibase Apply - Fallido",
                         "emoji": true
                       }
                     },
@@ -259,7 +285,7 @@ jobs:
                         },
                         {
                           "type": "mrkdwn",
-                          "text": "*Triggered by:*\n@${{ github.actor }}"
+                          "text": "*Triggered by:*\n${{ steps.mention.outputs.text }}"
                         }
                       ]
                     },

@@ -62,20 +62,12 @@ jobs:
           SLACK_OK: ${{ steps.slack-user.outputs.ok }}
           GITHUB_ACTOR: ${{ github.actor }}
         run: |
-          # Mapeo GitHub username → Slack ID
-          declare -A SLACK_MAP=(
-            ["rendis"]="U03K44YL4AY"
-            ["daweto"]="U060KD7NTAQ"
-            ["diaztunjano"]="U08LFB36SP2"
-            ["franciscobalmaceda"]="U09845BH74K"
-            ["lejgomezdu"]="U04B7GKLQ90"
-            ["alonsovch"]="U09845D27QB"
-            ["auirarrazaval"]="U039MGG9TMK"
-          )
+          # 1. Leer mapeo desde JSON centralizado
+          SLACK_MAP=$(curl -s "https://raw.githubusercontent.com/TetherEducation/tether-ci-cd/staging/config/slack-users.json")
+          SLACK_ID=$(echo "$SLACK_MAP" | jq -r --arg user "$GITHUB_ACTOR" '.[$user] // empty')
 
-          # 1. Buscar en mapeo
-          if [[ -n "${SLACK_MAP[$GITHUB_ACTOR]}" ]]; then
-            echo "text=<@${SLACK_MAP[$GITHUB_ACTOR]}>" >> $GITHUB_OUTPUT
+          if [ -n "$SLACK_ID" ]; then
+            echo "text=<@$SLACK_ID>" >> $GITHUB_OUTPUT
             exit 0
           fi
 
