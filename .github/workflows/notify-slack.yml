@@ -17,7 +17,7 @@ on:
       actor_email:
         required: false
         type: string
-        description: "Email del actor para @mencion real (github.event.pusher.email)"
+        description: "Email del actor para @mencion real"
     secrets:
       SLACK_WEBHOOK_URL:
         required: true
@@ -44,14 +44,6 @@ jobs:
             *) echo "name=$BRANCH" >> $GITHUB_OUTPUT ;;
           esac
 
-      - name: Debug inputs
-        run: |
-          echo "=== DEBUG INFO ==="
-          echo "actor_email input: '${{ inputs.actor_email }}'"
-          echo "SLACK_BOT_TOKEN exists: ${{ secrets.SLACK_BOT_TOKEN != '' }}"
-          echo "github.actor: '${{ github.actor }}'"
-          echo "=================="
-
       - name: Lookup Slack user by email
         id: slack-user
         if: ${{ inputs.actor_email != '' }}
@@ -62,14 +54,6 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           payload: |
             email: ${{ inputs.actor_email }}
-
-      - name: Debug Slack lookup result
-        if: ${{ inputs.actor_email != '' }}
-        run: |
-          echo "=== SLACK LOOKUP RESULT ==="
-          echo "ok: '${{ steps.slack-user.outputs.ok }}'"
-          echo "response: '${{ steps.slack-user.outputs.response }}'"
-          echo "==========================="
 
       - name: Set mention format
         id: mention
@@ -94,21 +78,61 @@ jobs:
           webhook-type: incoming-webhook
           payload: |
             {
-              "blocks": [
+              "attachments": [
                 {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "${{ inputs.status == 'success' && ':white_check_mark:' || ':x:' }} *${{ github.workflow }}* ${{ inputs.status == 'success' && 'exitoso' || 'FALLO' }}\n*Env:* ${{ steps.env.outputs.name }}\n*Repo:* `${{ github.repository }}`\n*Rama:* `${{ github.ref_name }}`\n*Por:* ${{ steps.mention.outputs.text }}\n*Commit:* `${{ github.sha }}`${{ inputs.custom_message != '' && format('\n*Nota:* {0}', inputs.custom_message) || '' }}"
-                  }
-                },
-                {
-                  "type": "actions",
-                  "elements": [
+                  "color": "${{ inputs.status == 'success' && '#36a64f' || '#dc3545' }}",
+                  "blocks": [
                     {
-                      "type": "button",
-                      "text": {"type": "plain_text", "text": "${{ inputs.status == 'success' && 'Ver Run' || 'Ver Logs' }}"},
-                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                      "type": "header",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "${{ inputs.status == 'success' && '✅ Deploy Exitoso' || '❌ Deploy Fallido' }}",
+                        "emoji": true
+                      }
+                    },
+                    {
+                      "type": "section",
+                      "fields": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Repo:*\n<${{ github.server_url }}/${{ github.repository }}|${{ github.repository }}>"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Rama:*\n`${{ github.ref_name }}`"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Env:*\n${{ steps.env.outputs.name }}"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Por:*\n${{ steps.mention.outputs.text }}"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "context",
+                      "elements": [
+                        {
+                          "type": "mrkdwn",
+                          "text": ":git: Commit: `${{ github.sha }}`${{ inputs.custom_message != '' && format(' | {0}', inputs.custom_message) || '' }}"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "actions",
+                      "elements": [
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "${{ inputs.status == 'success' && '📋 Ver Action' || '🔍 Ver Logs' }}",
+                            "emoji": true
+                          },
+                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                        }
+                      ]
                     }
                   ]
                 }
