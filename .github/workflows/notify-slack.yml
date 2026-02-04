@@ -44,9 +44,17 @@ jobs:
             *) echo "name=$BRANCH" >> $GITHUB_OUTPUT ;;
           esac
 
+      - name: Debug inputs
+        run: |
+          echo "=== DEBUG INFO ==="
+          echo "actor_email input: '${{ inputs.actor_email }}'"
+          echo "SLACK_BOT_TOKEN exists: ${{ secrets.SLACK_BOT_TOKEN != '' }}"
+          echo "github.actor: '${{ github.actor }}'"
+          echo "=================="
+
       - name: Lookup Slack user by email
         id: slack-user
-        if: ${{ inputs.actor_email != '' }}
+        if: ${{ inputs.actor_email != '' && secrets.SLACK_BOT_TOKEN != '' }}
         continue-on-error: true
         uses: slackapi/slack-github-action@v2.0.0
         with:
@@ -54,6 +62,14 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           payload: |
             email: ${{ inputs.actor_email }}
+
+      - name: Debug Slack lookup result
+        if: ${{ inputs.actor_email != '' }}
+        run: |
+          echo "=== SLACK LOOKUP RESULT ==="
+          echo "ok: '${{ steps.slack-user.outputs.ok }}'"
+          echo "response: '${{ steps.slack-user.outputs.response }}'"
+          echo "==========================="
 
       - name: Set mention format
         id: mention
