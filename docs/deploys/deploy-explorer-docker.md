@@ -21,16 +21,16 @@ jobs:
 
 ## Inputs
 
-| Input | Tipo | Requerido | Descripcion |
-|-------|------|-----------|-------------|
-| `environment` | string | Si | Ambiente (staging, production) |
-| `bootstrap_project_id` | string | Si | Project ID para autenticacion inicial |
-| `bootstrap_project_number` | string | Si | Project number para WIF |
-| `bootstrap_workload_identity_provider` | string | Si | Path del WIF provider |
-| `bootstrap_service_account` | string | Si | Service account email |
-| `deployment_config_secret_name` | string | Si | Nombre del secret con config |
-| `service_name` | string | Si | Key del servicio en config |
-| `docker_build_args` | string | No | Build args custom |
+| Input                                  | Tipo   | Requerido | Descripcion                           |
+| -------------------------------------- | ------ | --------- | ------------------------------------- |
+| `environment`                          | string | Si        | Ambiente (staging, production)        |
+| `bootstrap_project_id`                 | string | Si        | Project ID para autenticacion inicial |
+| `bootstrap_project_number`             | string | Si        | Project number para WIF               |
+| `bootstrap_workload_identity_provider` | string | Si        | Path del WIF provider                 |
+| `bootstrap_service_account`            | string | Si        | Service account email                 |
+| `deployment_config_secret_name`        | string | Si        | Nombre del secret con config          |
+| `service_name`                         | string | Si        | Key del servicio en config            |
+| `docker_build_args`                    | string | No        | Build args custom                     |
 
 ## Configuracion en Secret Manager
 

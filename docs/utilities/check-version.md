@@ -19,21 +19,21 @@ jobs:
 
 ## Inputs
 
-| Input | Tipo | Requerido | Default | Descripcion |
-|-------|------|-----------|---------|-------------|
-| `TAG_POSTFIX` | string | No | - | Sufijo para el tag (ej: `-api`, `-worker`) |
+| Input         | Tipo   | Requerido | Default | Descripcion                                |
+| ------------- | ------ | --------- | ------- | ------------------------------------------ |
+| `TAG_POSTFIX` | string | No        | -       | Sufijo para el tag (ej: `-api`, `-worker`) |
 
 ## Outputs
 
-| Output | Descripcion |
-|--------|-------------|
+| Output               | Descripcion                                     |
+| -------------------- | ----------------------------------------------- |
 | `SKIP_DEPLOY_OUTPUT` | `true` si el tag ya existe, `false` si es nuevo |
 
 ## Requisitos
 
 Tu repo debe tener un archivo `version.txt` en la raiz con la version:
 
-```
+```plaintext
 1.2.3
 ```
 
@@ -41,10 +41,10 @@ Tu repo debe tener un archivo `version.txt` en la raiz con la version:
 
 El tag se genera asi:
 
-| Rama | Formato |
-|------|---------|
+| Rama    | Formato                      |
+| ------- | ---------------------------- |
 | staging | `{version}{postfix}-staging` |
-| master | `{version}{postfix}-master` |
+| master  | `{version}{postfix}-master`  |
 
 Ejemplo con `version.txt = 1.2.3` y `TAG_POSTFIX = -api`:
 

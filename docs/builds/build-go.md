@@ -17,23 +17,23 @@ jobs:
 
 ## Inputs
 
-| Input | Tipo | Requerido | Default | Descripcion |
-|-------|------|-----------|---------|-------------|
-| `ENVIRONMENT` | string | Si | - | Ambiente (staging, production) |
-| `ECR_REPOSITORY` | string | Si | - | Nombre del repositorio en ECR |
-| `RELEASE_REVISION` | string | Si | - | Tag de la imagen |
-| `DOCKERFILE_PATH` | string | No | `./Dockerfile` | Ruta al Dockerfile |
+| Input              | Tipo   | Requerido | Default        | Descripcion                    |
+| ------------------ | ------ | --------- | -------------- | ------------------------------ |
+| `ENVIRONMENT`      | string | Si        | -              | Ambiente (staging, production) |
+| `ECR_REPOSITORY`   | string | Si        | -              | Nombre del repositorio en ECR  |
+| `RELEASE_REVISION` | string | Si        | -              | Tag de la imagen               |
+| `DOCKERFILE_PATH`  | string | No        | `./Dockerfile` | Ruta al Dockerfile             |
 
 ## Secrets
 
-| Secret | Requerido | Descripcion |
-|--------|-----------|-------------|
-| `AWS_ACCESS_KEY_ID` | Si* | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | Si* | AWS secret key |
-| `AWS_REGION` | Si* | Region AWS |
-| `GH_APP_CREDENTIALS_TOKEN` | Si* | Token para GOPRIVATE |
+| Secret                     | Requerido | Descripcion          |
+| -------------------------- | --------- | -------------------- |
+| `AWS_ACCESS_KEY_ID`        | Si\*      | AWS access key       |
+| `AWS_SECRET_ACCESS_KEY`    | Si\*      | AWS secret key       |
+| `AWS_REGION`               | Si\*      | Region AWS           |
+| `GH_APP_CREDENTIALS_TOKEN` | Si\*      | Token para GOPRIVATE |
 
-> *Configurados a nivel org
+> \*Configurados a nivel org
 
 ## Caracteristicas
 

@@ -17,12 +17,12 @@ Sin inputs requeridos.
 
 ## Secrets
 
-| Secret | Requerido | Descripcion |
-|--------|-----------|-------------|
-| `TESTING_SECRET_CONF` | Si | Contenido de secrets.json |
-| `SLACK_WEBHOOK` | No | Webhook notificaciones |
-| `BOT_SLACK_TOKEN` | No | Token bot Slack |
-| `BOT_SLACK_CHANNEL` | No | Canal Slack |
+| Secret                | Requerido | Descripcion               |
+| --------------------- | --------- | ------------------------- |
+| `TESTING_SECRET_CONF` | Si        | Contenido de secrets.json |
+| `SLACK_WEBHOOK`       | No        | Webhook notificaciones    |
+| `BOT_SLACK_TOKEN`     | No        | Token bot Slack           |
+| `BOT_SLACK_CHANNEL`   | No        | Canal Slack               |
 
 ## Servicios
 
@@ -40,7 +40,7 @@ services:
 
 ## Variables de entorno para tests
 
-```
+```plaintext
 TEST_DB_HOST: localhost
 TEST_DB_NAME: postgres
 TEST_DB_PASS: postgres

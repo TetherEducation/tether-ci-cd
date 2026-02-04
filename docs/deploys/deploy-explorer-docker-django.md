@@ -22,18 +22,18 @@ jobs:
 
 ## Inputs
 
-| Input | Tipo | Requerido | Default | Descripcion |
-|-------|------|-----------|---------|-------------|
-| `environment` | string | Si | - | Ambiente |
-| `bootstrap_project_id` | string | Si | - | Project ID bootstrap |
-| `bootstrap_project_number` | string | Si | - | Project number |
-| `bootstrap_workload_identity_provider` | string | Si | - | WIF provider path |
-| `bootstrap_service_account` | string | Si | - | SA email |
-| `deployment_config_secret_name` | string | Si | - | Secret con config |
-| `service_name` | string | Si | - | Key del servicio |
-| `migration_job_key` | string | Si | - | Key del job de migraciones |
-| `force_migrations` | boolean | No | false | Forzar migraciones |
-| `docker_build_args` | string | No | - | Build args custom |
+| Input                                  | Tipo    | Requerido | Default | Descripcion                |
+| -------------------------------------- | ------- | --------- | ------- | -------------------------- |
+| `environment`                          | string  | Si        | -       | Ambiente                   |
+| `bootstrap_project_id`                 | string  | Si        | -       | Project ID bootstrap       |
+| `bootstrap_project_number`             | string  | Si        | -       | Project number             |
+| `bootstrap_workload_identity_provider` | string  | Si        | -       | WIF provider path          |
+| `bootstrap_service_account`            | string  | Si        | -       | SA email                   |
+| `deployment_config_secret_name`        | string  | Si        | -       | Secret con config          |
+| `service_name`                         | string  | Si        | -       | Key del servicio           |
+| `migration_job_key`                    | string  | Si        | -       | Key del job de migraciones |
+| `force_migrations`                     | boolean | No        | false   | Forzar migraciones         |
+| `docker_build_args`                    | string  | No        | -       | Build args custom          |
 
 ## Configuracion en Secret Manager
 

@@ -20,23 +20,23 @@ jobs:
 
 ## Inputs
 
-| Input | Tipo | Requerido | Descripcion |
-|-------|------|-----------|-------------|
-| `ENVIRONMENT` | string | Si | Ambiente (staging, production) |
-| `ECR_REPOSITORY` | string | Si | Nombre del repositorio en ECR |
-| `KUBE_NAMESPACE` | string | Si | Namespace de Kubernetes |
-| `DEPLOYMENT_NAME` | string | Si | Nombre del deployment |
-| `CONTAINER_APP_NAME` | string | Si | Nombre del container en el pod |
-| `RELEASE_REVISION` | string | Si | Tag de la imagen a deployar |
+| Input                | Tipo   | Requerido | Descripcion                    |
+| -------------------- | ------ | --------- | ------------------------------ |
+| `ENVIRONMENT`        | string | Si        | Ambiente (staging, production) |
+| `ECR_REPOSITORY`     | string | Si        | Nombre del repositorio en ECR  |
+| `KUBE_NAMESPACE`     | string | Si        | Namespace de Kubernetes        |
+| `DEPLOYMENT_NAME`    | string | Si        | Nombre del deployment          |
+| `CONTAINER_APP_NAME` | string | Si        | Nombre del container en el pod |
+| `RELEASE_REVISION`   | string | Si        | Tag de la imagen a deployar    |
 
 ## Secrets
 
-| Secret | Requerido | Descripcion |
-|--------|-----------|-------------|
-| `KUBE_CONFIG_DATA` | Si | kubeconfig en base64 |
-| `AWS_ACCESS_KEY_ID` | Si | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | Si | AWS secret key |
-| `AWS_REGION` | Si | Region AWS |
+| Secret                  | Requerido | Descripcion          |
+| ----------------------- | --------- | -------------------- |
+| `KUBE_CONFIG_DATA`      | Si        | kubeconfig en base64 |
+| `AWS_ACCESS_KEY_ID`     | Si        | AWS access key       |
+| `AWS_SECRET_ACCESS_KEY` | Si        | AWS secret key       |
+| `AWS_REGION`            | Si        | Region AWS           |
 
 ## Caracteristicas
 
@@ -46,11 +46,11 @@ jobs:
 
 ## Diferencias con deploy-django/deploy-go
 
-| Workflow | Notificaciones | GIFs | Uso recomendado |
-|----------|----------------|------|-----------------|
-| `deploy-eks` | No | No | Pipelines limpios |
-| `deploy-django` | Si | Si | Django legacy |
-| `deploy-go` | Si | Si | Go legacy |
+| Workflow        | Notificaciones | GIFs | Uso recomendado   |
+| --------------- | -------------- | ---- | ----------------- |
+| `deploy-eks`    | No             | No   | Pipelines limpios |
+| `deploy-django` | Si             | Si   | Django legacy     |
+| `deploy-go`     | Si             | Si   | Go legacy         |
 
 ## Ejemplo con notificaciones separadas
 

@@ -12,11 +12,11 @@ on:
   workflow_dispatch:
     inputs:
       preview_run_id:
-        description: 'Run ID del Preview (ver Slack o Actions)'
+        description: "Run ID del Preview (ver Slack o Actions)"
         required: true
         type: string
       database:
-        description: 'Target database'
+        description: "Target database"
         type: choice
         options:
           - my-db-main
@@ -43,27 +43,27 @@ jobs:
 
 ## Inputs
 
-| Input | Tipo | Requerido | Default | Descripcion |
-|-------|------|-----------|---------|-------------|
-| `preview_run_id` | string | Si | - | Run ID del preview (validacion) |
-| `project_id` | string | Si | - | GCP Project ID |
-| `region` | string | No | us-central1 | GCP region |
-| `wif_provider` | string | Si | - | WIF provider path |
-| `service_account` | string | Si | - | Service account email |
-| `artifact_registry` | string | Si | - | Artifact Registry URL |
-| `repository` | string | Si | - | Nombre del repositorio |
-| `image_name` | string | Si | - | Nombre de la imagen Docker |
-| `job_name` | string | Si | - | Nombre del Cloud Run Job |
-| `database_name` | string | Si | - | Nombre de la base de datos |
-| `changelog_file` | string | No | changelog.master.xml | Archivo changelog |
-| `db_secret_name` | string | Si | - | Secret con password DB |
-| `dockerfile` | string | No | Dockerfile.liquibase | Dockerfile a usar |
+| Input               | Tipo   | Requerido | Default              | Descripcion                     |
+| ------------------- | ------ | --------- | -------------------- | ------------------------------- |
+| `preview_run_id`    | string | Si        | -                    | Run ID del preview (validacion) |
+| `project_id`        | string | Si        | -                    | GCP Project ID                  |
+| `region`            | string | No        | us-central1          | GCP region                      |
+| `wif_provider`      | string | Si        | -                    | WIF provider path               |
+| `service_account`   | string | Si        | -                    | Service account email           |
+| `artifact_registry` | string | Si        | -                    | Artifact Registry URL           |
+| `repository`        | string | Si        | -                    | Nombre del repositorio          |
+| `image_name`        | string | Si        | -                    | Nombre de la imagen Docker      |
+| `job_name`          | string | Si        | -                    | Nombre del Cloud Run Job        |
+| `database_name`     | string | Si        | -                    | Nombre de la base de datos      |
+| `changelog_file`    | string | No        | changelog.master.xml | Archivo changelog               |
+| `db_secret_name`    | string | Si        | -                    | Secret con password DB          |
+| `dockerfile`        | string | No        | Dockerfile.liquibase | Dockerfile a usar               |
 
 ## Secrets
 
-| Secret | Requerido | Descripcion |
-|--------|-----------|-------------|
-| `SLACK_WEBHOOK_URL` | No | Webhook para notificaciones |
+| Secret              | Requerido | Descripcion                 |
+| ------------------- | --------- | --------------------------- |
+| `SLACK_WEBHOOK_URL` | No        | Webhook para notificaciones |
 
 ## Flujo
 
@@ -94,7 +94,7 @@ El workflow verifica que:
 
 ## Flujo completo
 
-```
+```plaintext
 1. Ejecutar liquibase-preview.yml
 2. Revisar SQL en los logs
 3. Copiar Preview Run ID del Slack

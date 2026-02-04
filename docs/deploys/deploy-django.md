@@ -20,26 +20,26 @@ jobs:
 
 ## Inputs
 
-| Input | Tipo | Requerido | Descripcion |
-|-------|------|-----------|-------------|
-| `ENVIRONMENT` | string | Si | Ambiente (staging, production) |
-| `ECR_REPOSITORY` | string | Si | Nombre del repositorio en ECR |
-| `KUBE_NAMESPACE` | string | Si | Namespace de Kubernetes |
-| `DEPLOYMENT_NAME` | string | Si | Nombre del deployment |
-| `CONTAINER_APP_NAME` | string | Si | Nombre del container en el pod |
-| `RELEASE_REVISION` | string | Si | Tag de la imagen a deployar |
+| Input                | Tipo   | Requerido | Descripcion                    |
+| -------------------- | ------ | --------- | ------------------------------ |
+| `ENVIRONMENT`        | string | Si        | Ambiente (staging, production) |
+| `ECR_REPOSITORY`     | string | Si        | Nombre del repositorio en ECR  |
+| `KUBE_NAMESPACE`     | string | Si        | Namespace de Kubernetes        |
+| `DEPLOYMENT_NAME`    | string | Si        | Nombre del deployment          |
+| `CONTAINER_APP_NAME` | string | Si        | Nombre del container en el pod |
+| `RELEASE_REVISION`   | string | Si        | Tag de la imagen a deployar    |
 
 ## Secrets
 
-| Secret | Requerido | Descripcion |
-|--------|-----------|-------------|
-| `KUBE_CONFIG_DATA` | Si | kubeconfig en base64 |
-| `SLACK_WEBHOOK` | Si | Webhook para notificaciones |
-| `AWS_ACCESS_KEY_ID` | Si | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | Si | AWS secret key |
-| `AWS_REGION` | Si | Region AWS |
-| `BOT_SLACK_TOKEN` | No | Token bot Slack (para GIFs) |
-| `BOT_SLACK_CHANNEL` | No | Canal Slack |
+| Secret                  | Requerido | Descripcion                 |
+| ----------------------- | --------- | --------------------------- |
+| `KUBE_CONFIG_DATA`      | Si        | kubeconfig en base64        |
+| `SLACK_WEBHOOK`         | Si        | Webhook para notificaciones |
+| `AWS_ACCESS_KEY_ID`     | Si        | AWS access key              |
+| `AWS_SECRET_ACCESS_KEY` | Si        | AWS secret key              |
+| `AWS_REGION`            | Si        | Region AWS                  |
+| `BOT_SLACK_TOKEN`       | No        | Token bot Slack (para GIFs) |
+| `BOT_SLACK_CHANNEL`     | No        | Canal Slack                 |
 
 ## Caracteristicas
 

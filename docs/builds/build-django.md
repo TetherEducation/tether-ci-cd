@@ -17,25 +17,25 @@ jobs:
 
 ## Inputs
 
-| Input | Tipo | Requerido | Descripcion |
-|-------|------|-----------|-------------|
-| `ENVIRONMENT` | string | Si | Ambiente (staging, production) |
-| `ECR_REPOSITORY` | string | Si | Nombre del repositorio en ECR |
-| `RELEASE_REVISION` | string | Si | Tag de la imagen (generalmente `${{ github.sha }}`) |
+| Input              | Tipo   | Requerido | Descripcion                                         |
+| ------------------ | ------ | --------- | --------------------------------------------------- |
+| `ENVIRONMENT`      | string | Si        | Ambiente (staging, production)                      |
+| `ECR_REPOSITORY`   | string | Si        | Nombre del repositorio en ECR                       |
+| `RELEASE_REVISION` | string | Si        | Tag de la imagen (generalmente `${{ github.sha }}`) |
 
 ## Secrets
 
-| Secret | Requerido | Descripcion |
-|--------|-----------|-------------|
-| `AWS_ACCESS_KEY_ID` | No* | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | No* | AWS secret key |
-| `AWS_REGION` | No* | Region AWS |
-| `GH_APP_CREDENTIALS_TOKEN` | No* | Token para repos privados |
-| `SLACK_WEBHOOK` | No | Webhook para notificaciones |
-| `BOT_SLACK_TOKEN` | No | Token bot Slack |
-| `BOT_SLACK_CHANNEL` | No | Canal Slack |
+| Secret                     | Requerido | Descripcion                 |
+| -------------------------- | --------- | --------------------------- |
+| `AWS_ACCESS_KEY_ID`        | No\*      | AWS access key              |
+| `AWS_SECRET_ACCESS_KEY`    | No\*      | AWS secret key              |
+| `AWS_REGION`               | No\*      | Region AWS                  |
+| `GH_APP_CREDENTIALS_TOKEN` | No\*      | Token para repos privados   |
+| `SLACK_WEBHOOK`            | No        | Webhook para notificaciones |
+| `BOT_SLACK_TOKEN`          | No        | Token bot Slack             |
+| `BOT_SLACK_CHANNEL`        | No        | Canal Slack                 |
 
-> *Configurados a nivel org
+> \*Configurados a nivel org
 
 ## Caracteristicas
 

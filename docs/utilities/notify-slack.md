@@ -28,28 +28,28 @@ jobs:
 
 ## Inputs
 
-| Input | Tipo | Requerido | Descripcion |
-|-------|------|-----------|-------------|
-| `status` | string | Si | `success` o `failure` |
-| `environment` | string | No | Forzar ambiente (auto-detecta de rama) |
-| `custom_message` | string | No | Mensaje adicional |
-| `actor_email` | string | No | Email para @mencion via API |
+| Input            | Tipo   | Requerido | Descripcion                            |
+| ---------------- | ------ | --------- | -------------------------------------- |
+| `status`         | string | Si        | `success` o `failure`                  |
+| `environment`    | string | No        | Forzar ambiente (auto-detecta de rama) |
+| `custom_message` | string | No        | Mensaje adicional                      |
+| `actor_email`    | string | No        | Email para @mencion via API            |
 
 ## Secrets
 
-| Secret | Requerido | Descripcion |
-|--------|-----------|-------------|
-| `SLACK_WEBHOOK_URL` | Si | Incoming Webhook URL |
-| `SLACK_BOT_TOKEN` | No | Token bot (scope: `users:read.email`) |
+| Secret              | Requerido | Descripcion                           |
+| ------------------- | --------- | ------------------------------------- |
+| `SLACK_WEBHOOK_URL` | Si        | Incoming Webhook URL                  |
+| `SLACK_BOT_TOKEN`   | No        | Token bot (scope: `users:read.email`) |
 
 ## Auto-deteccion de ambiente
 
-| Rama | Ambiente |
-|------|----------|
-| main, master | PROD |
-| staging | STAGING |
-| dev, development | DEV |
-| otra | nombre de la rama |
+| Rama             | Ambiente          |
+| ---------------- | ----------------- |
+| main, master     | PROD              |
+| staging          | STAGING           |
+| dev, development | DEV               |
+| otra             | nombre de la rama |
 
 ## @Menciones
 
@@ -79,19 +79,19 @@ Edita `config/slack-users.json`:
 
 ## Formato de notificacion
 
-```
-┌─────────────────────────────────────┐
-│ ✅ Deploy Exitoso / ❌ Deploy Fallido │
-├─────────────────────────────────────┤
-│ Repo: org/repo                      │
-│ Rama: staging                       │
-│ Env: STAGING                        │
-│ Por: @usuario                       │
-├─────────────────────────────────────┤
-│ Commit: abc1234 | mensaje custom    │
-├─────────────────────────────────────┤
-│ [📋 Ver Action] [⋮]                 │
-└─────────────────────────────────────┘
+```plaintext
+┌────────────────────────────────────────┐
+│ ✅ Deploy Exitoso / ❌ Deploy Fallido  │
+├────────────────────────────────────────┤
+│ Repo: org/repo                         │
+│ Rama: staging                          │
+│ Env: STAGING                           │
+│ Por: @usuario                          │
+├────────────────────────────────────────┤
+│ Commit: abc1234 | mensaje custom       │
+├────────────────────────────────────────┤
+│ [📋 Ver Action] [⋮].                   │
+└────────────────────────────────────────┘
 ```
 
 ## Ejemplo completo

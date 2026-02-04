@@ -19,18 +19,18 @@ jobs:
 
 ## Inputs
 
-| Input | Tipo | Requerido | Descripcion |
-|-------|------|-----------|-------------|
-| `ECR_REPOSITORY` | string | Si | Nombre del repositorio en ECR |
-| `RELEASE_REVISION` | string | Si | Tag de la imagen |
+| Input              | Tipo   | Requerido | Descripcion                   |
+| ------------------ | ------ | --------- | ----------------------------- |
+| `ECR_REPOSITORY`   | string | Si        | Nombre del repositorio en ECR |
+| `RELEASE_REVISION` | string | Si        | Tag de la imagen              |
 
 ## Secrets
 
-| Secret | Requerido | Descripcion |
-|--------|-----------|-------------|
-| `AWS_ACCESS_KEY_ID` | Si | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | Si | AWS secret key |
-| `AWS_REGION` | Si | Region AWS |
+| Secret                  | Requerido | Descripcion    |
+| ----------------------- | --------- | -------------- |
+| `AWS_ACCESS_KEY_ID`     | Si        | AWS access key |
+| `AWS_SECRET_ACCESS_KEY` | Si        | AWS secret key |
+| `AWS_REGION`            | Si        | Region AWS     |
 
 ## Caracteristicas
 
@@ -41,8 +41,8 @@ jobs:
 
 ## Diferencias con otros builds
 
-| Workflow | Notificaciones | Build args | Uso |
-|----------|----------------|------------|-----|
-| `build-image` | No | Basicos | Simple, sin dependencias |
-| `build-django` | Si | Completos | Django con secrets |
-| `build-go` | No | Completos | Go con GOPRIVATE |
+| Workflow       | Notificaciones | Build args | Uso                      |
+| -------------- | -------------- | ---------- | ------------------------ |
+| `build-image`  | No             | Basicos    | Simple, sin dependencias |
+| `build-django` | Si             | Completos  | Django con secrets       |
+| `build-go`     | No             | Completos  | Go con GOPRIVATE         |

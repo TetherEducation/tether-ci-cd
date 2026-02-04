@@ -25,7 +25,7 @@ jobs:
       ENVIRONMENT: ${{ github.ref_name == 'master' && 'production' || 'staging' }}
       ECR_REPOSITORY: my-service
       RELEASE_REVISION: ${{ github.sha }}
-    secrets: inherit  # Hereda secrets de la org
+    secrets: inherit # Hereda secrets de la org
 
   deploy:
     needs: build
