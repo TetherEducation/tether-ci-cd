@@ -198,7 +198,7 @@ jobs:
                       "type": "header",
                       "text": {
                         "type": "plain_text",
-                        "text": "🔍 Liquibase Preview - Cambios Detectados",
+                        "text": "🔍 Liquibase Preview - Changes Detected",
                         "emoji": true
                       }
                     },
@@ -239,7 +239,7 @@ jobs:
                           "type": "button",
                           "text": {
                             "type": "plain_text",
-                            "text": "📋 Ver SQL Preview",
+                            "text": "📋 View SQL Preview",
                             "emoji": true
                           },
                           "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
@@ -248,7 +248,7 @@ jobs:
                           "type": "button",
                           "text": {
                             "type": "plain_text",
-                            "text": "▶️ Aplicar Migración",
+                            "text": "▶️ Apply Migration",
                             "emoji": true
                           },
                           "style": "primary",
@@ -277,7 +277,7 @@ jobs:
                       "type": "header",
                       "text": {
                         "type": "plain_text",
-                        "text": "ℹ️ Liquibase Preview - Sin Cambios",
+                        "text": "ℹ️ Liquibase Preview - No Changes",
                         "emoji": true
                       }
                     },
@@ -298,7 +298,7 @@ jobs:
                         },
                         {
                           "type": "mrkdwn",
-                          "text": "*Estado:*\nNo hay migraciones pendientes"
+                          "text": "*Status:*\nNo pending migrations"
                         }
                       ]
                     },
@@ -309,7 +309,7 @@ jobs:
                           "type": "button",
                           "text": {
                             "type": "plain_text",
-                            "text": "📋 Ver Logs",
+                            "text": "📋 View Logs",
                             "emoji": true
                           },
                           "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
@@ -354,7 +354,7 @@ jobs:
                       "type": "header",
                       "text": {
                         "type": "plain_text",
-                        "text": "❌ Liquibase Preview - Fallido",
+                        "text": "❌ Liquibase Preview - Failed",
                         "emoji": true
                       }
                     },
@@ -378,7 +378,7 @@ jobs:
                           "type": "button",
                           "text": {
                             "type": "plain_text",
-                            "text": "🔍 Ver Logs",
+                            "text": "🔍 View Logs",
                             "emoji": true
                           },
                           "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

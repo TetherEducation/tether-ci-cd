@@ -208,7 +208,7 @@ jobs:
                       "type": "header",
                       "text": {
                         "type": "plain_text",
-                        "text": "✅ Liquibase Apply - Completado",
+                        "text": "✅ Liquibase Apply - Completed",
                         "emoji": true
                       }
                     },
@@ -272,7 +272,7 @@ jobs:
                       "type": "header",
                       "text": {
                         "type": "plain_text",
-                        "text": "❌ Liquibase Apply - Fallido",
+                        "text": "❌ Liquibase Apply - Failed",
                         "emoji": true
                       }
                     },
