@@ -213,7 +213,7 @@ jobs:
                       "elements": [
                         {
                           "type": "mrkdwn",
-                          "text": "⏳ Review the SQL preview and click Apply when ready"
+                          "text": "⏳ Review SQL and use *Preview Run ID:* `${{ github.run_id }}` to apply"
                         }
                       ]
                     },

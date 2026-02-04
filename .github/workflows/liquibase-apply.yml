@@ -3,6 +3,10 @@ name: Liquibase Apply
 on:
   workflow_call:
     inputs:
+      preview_run_id:
+        required: true
+        type: string
+        description: "Run ID del preview (requerido para validar)"
       project_id:
         required: true
         type: string
@@ -58,10 +62,36 @@ on:
 permissions:
   contents: read
   id-token: write
+  actions: read
 
 jobs:
+  validate-preview:
+    name: Validate Preview
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check preview artifact exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_RUN_ID: ${{ inputs.preview_run_id }}
+        run: |
+          echo "Validating preview run: $PREVIEW_RUN_ID"
+
+          # Check if the run exists and has the expected artifact
+          ARTIFACT=$(gh api "/repos/${{ github.repository }}/actions/runs/$PREVIEW_RUN_ID/artifacts" \
+            --jq '.artifacts[] | select(.name | startswith("liquibase-preview-"))' 2>/dev/null || echo "")
+
+          if [ -z "$ARTIFACT" ]; then
+            echo "::error::No se encontró preview con Run ID: $PREVIEW_RUN_ID"
+            echo "::error::Ejecuta primero 'DB Migration - Preview' y usa el Run ID mostrado en Slack"
+            exit 1
+          fi
+
+          echo "✅ Preview válido encontrado"
+          echo "Artifact: $(echo "$ARTIFACT" | jq -r '.name')"
+
   apply:
     name: Apply Migration (update)
+    needs: validate-preview
     runs-on: ubuntu-latest
     env:
       PROJECT_ID: ${{ inputs.project_id }}
