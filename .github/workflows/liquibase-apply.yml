@@ -1,0 +1,253 @@
+name: Liquibase Apply
+
+on:
+  workflow_call:
+    inputs:
+      project_id:
+        required: true
+        type: string
+        description: "GCP Project ID"
+      region:
+        required: false
+        type: string
+        default: "us-central1"
+      wif_provider:
+        required: true
+        type: string
+        description: "Workload Identity Federation provider"
+      service_account:
+        required: true
+        type: string
+        description: "GCP Service Account email"
+      artifact_registry:
+        required: true
+        type: string
+        description: "Artifact Registry URL"
+      repository:
+        required: true
+        type: string
+        description: "Artifact Registry repository name"
+      image_name:
+        required: true
+        type: string
+        description: "Docker image name"
+      job_name:
+        required: true
+        type: string
+        description: "Cloud Run Job name"
+      database_name:
+        required: true
+        type: string
+        description: "Target database name"
+      changelog_file:
+        required: false
+        type: string
+        default: "changelog.master.xml"
+      db_secret_name:
+        required: true
+        type: string
+        description: "Secret Manager secret name for DB password"
+      dockerfile:
+        required: false
+        type: string
+        default: "Dockerfile.liquibase"
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  apply:
+    name: Apply Migration (update)
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_ID: ${{ inputs.project_id }}
+      REGION: ${{ inputs.region }}
+      ARTIFACT_REGISTRY: ${{ inputs.artifact_registry }}
+      REPOSITORY: ${{ inputs.repository }}
+      IMAGE_NAME: ${{ inputs.image_name }}
+      JOB_NAME: ${{ inputs.job_name }}
+      DATABASE_NAME: ${{ inputs.database_name }}
+      CHANGELOG_FILE: ${{ inputs.changelog_file }}
+      DB_SECRET_NAME: ${{ inputs.db_secret_name }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ inputs.wif_provider }}
+          service_account: ${{ inputs.service_account }}
+
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "$ARTIFACT_REGISTRY"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ inputs.dockerfile }}
+          push: true
+          tags: |
+            ${{ inputs.artifact_registry }}/${{ inputs.project_id }}/${{ inputs.repository }}/${{ inputs.image_name }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Get DB Host from existing job
+        id: db-host
+        run: |
+          DB_HOST=$(gcloud run jobs describe "$JOB_NAME" \
+            --region="$REGION" \
+            --project="$PROJECT_ID" \
+            --format="value(spec.template.spec.template.spec.containers[0].env[0].value)")
+          echo "host=$DB_HOST" >> $GITHUB_OUTPUT
+
+      - name: Apply migration (update)
+        run: |
+          DB_HOST="${{ steps.db-host.outputs.host }}"
+          JDBC_URL="jdbc:postgresql://${DB_HOST}:5432/$DATABASE_NAME"
+
+          gcloud run jobs update "$JOB_NAME" \
+            --image="$ARTIFACT_REGISTRY/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME:${{ github.sha }}" \
+            --region="$REGION" \
+            --project="$PROJECT_ID" \
+            --set-env-vars="LIQUIBASE_COMMAND_URL=$JDBC_URL,LIQUIBASE_COMMAND_USERNAME=postgres" \
+            --set-secrets="LIQUIBASE_COMMAND_PASSWORD=${DB_SECRET_NAME}:latest" \
+            --args="--changelog-file=$CHANGELOG_FILE,update"
+
+          echo "Executing migration (update)..."
+          gcloud run jobs execute "$JOB_NAME" \
+            --region="$REGION" \
+            --project="$PROJECT_ID" \
+            --wait
+
+          echo "Migration completed successfully."
+
+      - name: Get execution logs
+        if: always()
+        run: |
+          echo "Fetching migration logs..."
+          sleep 5
+          gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=$JOB_NAME" \
+            --limit=100 \
+            --project="$PROJECT_ID" \
+            --format="table(timestamp,textPayload)" \
+            --freshness=5m \
+            || echo "Could not fetch logs"
+
+  notify-success:
+    needs: apply
+    if: success()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack - Success
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "#36a64f",
+                  "blocks": [
+                    {
+                      "type": "header",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "✅ Migration Completed",
+                        "emoji": true
+                      }
+                    },
+                    {
+                      "type": "section",
+                      "fields": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Database:*\n`${{ inputs.database_name }}`"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Applied by:*\n@${{ github.actor }}"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "context",
+                      "elements": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+
+  notify-failure:
+    needs: apply
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack - Failure
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "#dc3545",
+                  "blocks": [
+                    {
+                      "type": "header",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "❌ Migration Failed",
+                        "emoji": true
+                      }
+                    },
+                    {
+                      "type": "section",
+                      "fields": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Database:*\n`${{ inputs.database_name }}`"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Triggered by:*\n@${{ github.actor }}"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "actions",
+                      "elements": [
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "🔍 View Logs",
+                            "emoji": true
+                          },
+                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
