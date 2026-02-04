@@ -54,7 +54,7 @@ jobs:
 
       - name: Lookup Slack user by email
         id: slack-user
-        if: ${{ inputs.actor_email != '' && secrets.SLACK_BOT_TOKEN != '' }}
+        if: ${{ inputs.actor_email != '' }}
         continue-on-error: true
         uses: slackapi/slack-github-action@v2.0.0
         with:
