@@ -150,6 +150,27 @@ jobs:
                             "emoji": true
                           },
                           "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                        },
+                        {
+                          "type": "overflow",
+                          "options": [
+                            {
+                              "text": {
+                                "type": "plain_text",
+                                "text": "📖 Cómo configurar",
+                                "emoji": true
+                              },
+                              "url": "https://github.com/TetherEducation/tether-ci-cd/blob/staging/docs/slack-notifications.md"
+                            },
+                            {
+                              "text": {
+                                "type": "plain_text",
+                                "text": "🔧 Ver workflow",
+                                "emoji": true
+                              },
+                              "url": "${{ github.server_url }}/${{ github.repository }}/tree/${{ github.ref_name }}/.github/workflows"
+                            }
+                          ]
                         }
                       ]
                     }
