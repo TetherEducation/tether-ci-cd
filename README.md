@@ -1,18 +1,84 @@
-# Github Actions CI/CD workflows
+# Tether CI/CD Workflows
 
-This repo contains our CI/CD Github Actions workflows defined in folder [workflows/](.github/workflows/).
-It also syncs the workflows via pull requests to all repositories defined in [.github/syncs.yml][2] (using action [GitHub File Sync][1]).
+Workflows reutilizables de GitHub Actions para builds, deploys, testing y utilidades.
 
-## Usage
+## Quick Start
 
-Remember that master branch is protected. So you need to either use *dev* branch or create a new branch for PR's. Don't forget to delete any new branches after you merge them. If you use *dev* it will be automatically reset every time something is merged to master.
+```yaml
+jobs:
+  deploy:
+    uses: TetherEducation/tether-ci-cd/.github/workflows/deploy-eks.yml@staging
+    with:
+      ENVIRONMENT: staging
+      ECR_REPOSITORY: my-app
+      # ... otros inputs
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      # ... otros secrets
+```
 
-### Create workflows
+> **Nota:** Los secrets comunes ya estan configurados a nivel de organizacion TetherEducation.
 
-Create or modify a yaml file in [workflows/](.github/workflows/). Also update README.md with details about your workflow and remember that this is a public repository.
+## Workflows Disponibles
 
-Push your changes to dev or a separate branch. Once you are done with all your changes. Merge into master.
+### Builds (AWS ECR)
 
-## Workflows
+| Workflow | Descripcion | Doc |
+|----------|-------------|-----|
+| `build-django.yml` | Build Python/Django con cache | [Ver](docs/builds/build-django.md) |
+| `build-go.yml` | Build Go con GOPRIVATE | [Ver](docs/builds/build-go.md) |
+| `build-image.yml` | Build Docker generico | [Ver](docs/builds/build-image.md) |
 
-Descriptions of our current workflows.
+### Deploys (AWS EKS)
+
+| Workflow | Descripcion | Doc |
+|----------|-------------|-----|
+| `deploy-django.yml` | Deploy Django a EKS con Slack | [Ver](docs/deploys/deploy-django.md) |
+| `deploy-eks.yml` | Deploy Go a EKS (limpio) | [Ver](docs/deploys/deploy-eks.md) |
+| `deploy-go.yml` | Deploy Go a EKS con Slack | [Ver](docs/deploys/deploy-go.md) |
+
+### Deploys (GCP Cloud Run)
+
+| Workflow | Descripcion | Doc |
+|----------|-------------|-----|
+| `deploy-explorer-docker.yml` | Deploy multi-region a Cloud Run | [Ver](docs/deploys/deploy-explorer-docker.md) |
+| `deploy-explorer-docker-django.yml` | Deploy Django a Cloud Run + migraciones | [Ver](docs/deploys/deploy-explorer-docker-django.md) |
+
+### Database
+
+| Workflow | Descripcion | Doc |
+|----------|-------------|-----|
+| `liquibase-preview.yml` | Preview de migraciones (update-sql) | [Ver](docs/database/liquibase-preview.md) |
+| `liquibase-apply.yml` | Aplicar migraciones (update) | [Ver](docs/database/liquibase-apply.md) |
+
+### Testing
+
+| Workflow | Descripcion | Doc |
+|----------|-------------|-----|
+| `test-django.yml` | Tests Django con PostgreSQL/PostGIS | [Ver](docs/testing/test-django.md) |
+
+### Utilities
+
+| Workflow | Descripcion | Doc |
+|----------|-------------|-----|
+| `notify-slack.yml` | Notificaciones Slack para deploys | [Ver](docs/utilities/notify-slack.md) |
+| `check-version.yml` | Versionado y tags automaticos | [Ver](docs/utilities/check-version.md) |
+
+## Configuracion
+
+| Archivo | Descripcion |
+|---------|-------------|
+| [config/slack-users.json](config/slack-users.json) | Mapeo GitHub username → Slack ID |
+
+## Guias
+
+- [Getting Started](docs/getting-started.md) - Como integrar estos workflows en tu repo
+
+## Ramas
+
+| Rama | Uso |
+|------|-----|
+| `staging` | Desarrollo y pruebas |
+| `master` | Produccion (protegida) |
+
+> Para cambios: crear PR a `staging`, probar, luego PR a `master`.
