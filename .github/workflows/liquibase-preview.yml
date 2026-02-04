@@ -320,3 +320,72 @@ jobs:
                 }
               ]
             }
+
+  notify-failure:
+    needs: preview
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set Slack mention
+        id: mention
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+        run: |
+          SLACK_MAP=$(curl -s "https://raw.githubusercontent.com/TetherEducation/tether-ci-cd/staging/config/slack-users.json")
+          SLACK_ID=$(echo "$SLACK_MAP" | jq -r --arg user "$GITHUB_ACTOR" '.[$user] // empty')
+          if [ -n "$SLACK_ID" ]; then
+            echo "text=<@$SLACK_ID>" >> $GITHUB_OUTPUT
+          else
+            echo "text=@$GITHUB_ACTOR" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Notify Slack - Failure
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "#dc3545",
+                  "blocks": [
+                    {
+                      "type": "header",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "❌ Liquibase Preview - Fallido",
+                        "emoji": true
+                      }
+                    },
+                    {
+                      "type": "section",
+                      "fields": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Database:*\n`${{ inputs.database_name }}`"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Triggered by:*\n${{ steps.mention.outputs.text }}"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "actions",
+                      "elements": [
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "🔍 Ver Logs",
+                            "emoji": true
+                          },
+                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
