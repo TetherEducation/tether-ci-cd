@@ -1,0 +1,118 @@
+name: SPA Sync to GCS
+description: Sync SPA build to GCS with gsutil rsync, re-upload index (and optional fallback) with no-cache, optional CDN invalidation.
+inputs:
+  bucket:
+    description: GCS bucket name
+    required: true
+  path_prefix:
+    description: Object prefix (e.g. tenant ID or empty for root)
+    required: false
+    default: ''
+  source_dir:
+    description: Local build directory to sync (e.g. dist/)
+    required: false
+    default: 'dist/'
+  index_file:
+    description: Index file name to re-upload with no-cache (e.g. index.html, app.html)
+    required: false
+    default: 'index.html'
+  index_cache_control:
+    description: Cache-Control for index and fallback
+    required: false
+    default: 'no-cache, no-store, must-revalidate'
+  fallback_path:
+    description: Optional file to re-upload with same Cache-Control (e.g. 404.html)
+    required: false
+    default: ''
+  url_map:
+    description: URL map name for CDN cache invalidation
+    required: false
+    default: ''
+  project:
+    description: GCP project for CDN invalidation
+    required: false
+    default: ''
+  path:
+    description: Path(s) to invalidate (e.g. /* or /)
+    required: false
+    default: '/*'
+  host:
+    description: Optional host for CDN invalidation
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Normalize path prefix
+      id: prefix
+      shell: bash
+      run: |
+        PREFIX="${{ inputs.path_prefix }}"
+        PREFIX="${PREFIX#/}"
+        PREFIX="${PREFIX%/}"
+        if [ -n "$PREFIX" ]; then
+          echo "destination=${PREFIX}/" >> "$GITHUB_OUTPUT"
+        else
+          echo "destination=" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Sync build to GCS
+      shell: bash
+      run: |
+        BUCKET="${{ inputs.bucket }}"
+        DEST_SUFFIX="${{ steps.prefix.outputs.destination }}"
+        SOURCE="${{ inputs.source_dir }}"
+        INDEX_FILE="${{ inputs.index_file }}"
+        FALLBACK_PATH="${{ inputs.fallback_path }}"
+        # Escape . for regex and build exclude pattern so index/fallback are only uploaded with no-cache later
+        INDEX_ESC="${INDEX_FILE//./\\.}"
+        EXCLUDE_PATTERN="^${INDEX_ESC}$"
+        if [ -n "$FALLBACK_PATH" ]; then
+          FALLBACK_ESC="${FALLBACK_PATH//./\\.}"
+          EXCLUDE_PATTERN="${EXCLUDE_PATTERN}|^${FALLBACK_ESC}$"
+        fi
+        gsutil -m rsync -r -d -x "$EXCLUDE_PATTERN" "$SOURCE" "gs://${BUCKET}/${DEST_SUFFIX}"
+
+    - name: Upload index with no-cache
+      shell: bash
+      run: |
+        BUCKET="${{ inputs.bucket }}"
+        DEST_SUFFIX="${{ steps.prefix.outputs.destination }}"
+        SOURCE="${{ inputs.source_dir }}"
+        INDEX_FILE="${{ inputs.index_file }}"
+        CACHE_CONTROL="${{ inputs.index_cache_control }}"
+        SOURCE_FILE="${SOURCE%/}/${INDEX_FILE}"
+        if [ ! -f "$SOURCE_FILE" ]; then
+          echo "::error::Index file not found: $SOURCE_FILE"
+          exit 1
+        fi
+        gsutil -h "Cache-Control: ${CACHE_CONTROL}" cp "$SOURCE_FILE" "gs://${BUCKET}/${DEST_SUFFIX}${INDEX_FILE}"
+
+    - name: Upload fallback with no-cache
+      if: inputs.fallback_path != ''
+      shell: bash
+      run: |
+        BUCKET="${{ inputs.bucket }}"
+        DEST_SUFFIX="${{ steps.prefix.outputs.destination }}"
+        SOURCE="${{ inputs.source_dir }}"
+        FALLBACK="${{ inputs.fallback_path }}"
+        CACHE_CONTROL="${{ inputs.index_cache_control }}"
+        SOURCE_FILE="${SOURCE%/}/${FALLBACK}"
+        if [ ! -f "$SOURCE_FILE" ]; then
+          echo "::error::Fallback file not found: $SOURCE_FILE"
+          exit 1
+        fi
+        gsutil -h "Cache-Control: ${CACHE_CONTROL}" cp "$SOURCE_FILE" "gs://${BUCKET}/${DEST_SUFFIX}${FALLBACK}"
+
+    - name: Invalidate CDN cache
+      if: inputs.url_map != '' && inputs.project != ''
+      shell: bash
+      run: |
+        PATH_ARG='${{ inputs.path }}'
+        HOST_ARG='${{ inputs.host }}'
+        if [ -n "$HOST_ARG" ]; then
+          gcloud compute url-maps invalidate-cdn-cache '${{ inputs.url_map }}' --path="$PATH_ARG" --project='${{ inputs.project }}' --host="$HOST_ARG"
+        else
+          gcloud compute url-maps invalidate-cdn-cache '${{ inputs.url_map }}' --path="$PATH_ARG" --project='${{ inputs.project }}'
+        fi

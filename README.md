@@ -44,6 +44,12 @@ jobs:
 | `deploy-explorer-docker.yml`        | Deploy multi-region a Cloud Run         | [Ver](docs/deploys/deploy-explorer-docker.md)        |
 | `deploy-explorer-docker-django.yml` | Deploy Django a Cloud Run + migraciones | [Ver](docs/deploys/deploy-explorer-docker-django.md) |
 
+### Actions (GCP GCS)
+
+| Action           | Descripcion                                              | Doc                                  |
+| ---------------- | -------------------------------------------------------- | ------------------------------------ |
+| `spa-sync-gcs`   | Sync SPA a GCS con index no-cache y opcional CDN invalidation | [Ver](docs/deploys/spa-sync-gcs.md) |
+
 ### Database
 
 | Workflow                | Descripcion                         | Doc                                       |
