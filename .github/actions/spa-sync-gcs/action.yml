@@ -112,7 +112,7 @@ runs:
         PATH_ARG='${{ inputs.path }}'
         HOST_ARG='${{ inputs.host }}'
         if [ -n "$HOST_ARG" ]; then
-          gcloud compute url-maps invalidate-cdn-cache '${{ inputs.url_map }}' --path="$PATH_ARG" --project='${{ inputs.project }}' --host="$HOST_ARG --async"
+          gcloud compute url-maps invalidate-cdn-cache '${{ inputs.url_map }}' --path="$PATH_ARG" --project='${{ inputs.project }}' --host="$HOST_ARG" --async
         else
-          gcloud compute url-maps invalidate-cdn-cache '${{ inputs.url_map }}' --path="$PATH_ARG" --project='${{ inputs.project }}' --async"
+          gcloud compute url-maps invalidate-cdn-cache '${{ inputs.url_map }}' --path="$PATH_ARG" --project='${{ inputs.project }}' --async
         fi
