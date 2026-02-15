@@ -32,16 +32,23 @@ jobs:
         id: env
         run: |
           if [ -n "${{ inputs.environment }}" ]; then
-            echo "name=${{ inputs.environment }}" >> $GITHUB_OUTPUT
-            exit 0
+            ENV_NAME="${{ inputs.environment }}"
+          else
+            BRANCH="${{ github.ref_name }}"
+            case "$BRANCH" in
+              main|master) ENV_NAME="PROD" ;;
+              staging) ENV_NAME="STAGING" ;;
+              dev|development) ENV_NAME="DEV" ;;
+              *) ENV_NAME="$BRANCH" ;;
+            esac
           fi
 
-          BRANCH="${{ github.ref_name }}"
-          case "$BRANCH" in
-            main|master) echo "name=PROD" >> $GITHUB_OUTPUT ;;
-            staging) echo "name=STAGING" >> $GITHUB_OUTPUT ;;
-            dev|development) echo "name=DEV" >> $GITHUB_OUTPUT ;;
-            *) echo "name=$BRANCH" >> $GITHUB_OUTPUT ;;
+          echo "name=$ENV_NAME" >> $GITHUB_OUTPUT
+          case "$ENV_NAME" in
+            PROD) echo "emoji=🛡️" >> $GITHUB_OUTPUT ;;
+            STAGING) echo "emoji=🚧" >> $GITHUB_OUTPUT ;;
+            DEV) echo "emoji=🧪" >> $GITHUB_OUTPUT ;;
+            *) echo "emoji=📌" >> $GITHUB_OUTPUT ;;
           esac
 
       - name: Lookup Slack user by email
@@ -97,6 +104,15 @@ jobs:
           echo "title=$TITLE" >> $GITHUB_OUTPUT
           AUTHOR=$(echo "$COMMIT_DATA" | jq -r '.commit.author.name' | tr '"' "'")
           echo "author=$AUTHOR" >> $GITHUB_OUTPUT
+          TAG=$(curl -s -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO/git/matching-refs/tags" \
+            | jq -r --arg sha "$SHA" '.[] | select(.object.sha == $sha) | .ref' \
+            | sed 's|refs/tags/||' | head -1)
+          if [ -n "$TAG" ]; then
+            echo "tag=:label: $TAG" >> $GITHUB_OUTPUT
+          else
+            echo "tag=" >> $GITHUB_OUTPUT
+          fi
 
       - name: Notify Slack
         uses: slackapi/slack-github-action@v2.0.0
@@ -130,7 +146,7 @@ jobs:
                         },
                         {
                           "type": "mrkdwn",
-                          "text": "*Env:*\n${{ steps.env.outputs.name }}"
+                          "text": "*Env:*\n${{ steps.env.outputs.emoji }} ${{ steps.env.outputs.name }}"
                         },
                         {
                           "type": "mrkdwn",
@@ -143,7 +159,7 @@ jobs:
                       "elements": [
                         {
                           "type": "mrkdwn",
-                          "text": ":git: `${{ steps.commit.outputs.short_sha }}` ${{ steps.commit.outputs.title }}\n:bust_in_silhouette: ${{ steps.commit.outputs.author }}${{ inputs.custom_message != '' && format(' | {0}', inputs.custom_message) || '' }}"
+                          "text": ":git: `${{ steps.commit.outputs.short_sha }}` ${{ steps.commit.outputs.title }}${{ steps.commit.outputs.tag != '' && format('\n{0}', steps.commit.outputs.tag) || '' }}\n:bust_in_silhouette: ${{ steps.commit.outputs.author }}${{ inputs.custom_message != '' && format(' | {0}', inputs.custom_message) || '' }}"
                         }
                       ]
                     },
