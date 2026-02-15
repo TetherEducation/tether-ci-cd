@@ -83,6 +83,21 @@ jobs:
           # 3. Fallback: GitHub username
           echo "text=@$GITHUB_ACTOR" >> $GITHUB_OUTPUT
 
+      - name: Get commit info
+        id: commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          COMMIT_DATA=$(curl -s -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO/commits/$SHA")
+          echo "short_sha=${SHA:0:7}" >> $GITHUB_OUTPUT
+          TITLE=$(echo "$COMMIT_DATA" | jq -r '.commit.message' | head -1 | tr '"' "'")
+          echo "title=$TITLE" >> $GITHUB_OUTPUT
+          AUTHOR=$(echo "$COMMIT_DATA" | jq -r '.commit.author.name' | tr '"' "'")
+          echo "author=$AUTHOR" >> $GITHUB_OUTPUT
+
       - name: Notify Slack
         uses: slackapi/slack-github-action@v2.0.0
         with:
@@ -128,7 +143,7 @@ jobs:
                       "elements": [
                         {
                           "type": "mrkdwn",
-                          "text": ":git: Commit: `${{ github.sha }}`${{ inputs.custom_message != '' && format(' | {0}', inputs.custom_message) || '' }}"
+                          "text": ":git: `${{ steps.commit.outputs.short_sha }}` ${{ steps.commit.outputs.title }}\n:bust_in_silhouette: ${{ steps.commit.outputs.author }}${{ inputs.custom_message != '' && format(' | {0}', inputs.custom_message) || '' }}"
                         }
                       ]
                     },
