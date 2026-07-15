@@ -22,10 +22,13 @@ inputs:
     default: 'no-cache, no-store, must-revalidate'
   gzip_extensions:
     description: >-
-      Comma-separated file extensions to upload gzip-compressed at rest
-      (gsutil rsync -j, served with Content-Encoding gzip; GCS transcodes for
-      clients that do not accept gzip). Empty disables compression (default,
-      previous behavior). Note gzipped objects re-upload on every sync.
+      Comma-separated file extensions stored gzip-compressed at rest (gsutil
+      cp -z: served with Content-Encoding gzip; GCS transcodes for clients
+      that do not accept gzip). Applies to files under subdirectories of
+      source_dir (hashed assets); root-level files (index, robots.txt,
+      sitemap.xml) are never compressed so their Cache-Control stays intact.
+      Empty disables compression (default, previous behavior). Matching
+      subdirectories re-upload on every run.
     required: false
     default: ''
   asset_cache_control:
@@ -114,11 +117,35 @@ runs:
         if [ -n "$ASSET_CACHE_CONTROL" ]; then
           GSUTIL_HDR=(-h "Cache-Control: ${ASSET_CACHE_CONTROL}")
         fi
-        GZIP_FLAG=()
-        if [ -n "$GZIP_EXTENSIONS" ]; then
-          GZIP_FLAG=(-j "$GZIP_EXTENSIONS")
+        gsutil "${GSUTIL_HDR[@]}" -m rsync -r -d -x "$EXCLUDE_PATTERN" "$SOURCE" "gs://${BUCKET}/${DEST_SUFFIX}"
+
+    - name: Re-upload compressible assets gzipped at rest
+      if: inputs.gzip_extensions != ''
+      shell: bash
+      run: |
+        BUCKET="${{ inputs.bucket }}"
+        DEST_SUFFIX="${{ steps.prefix.outputs.destination }}"
+        SOURCE="${{ inputs.source_dir }}"
+        GZIP_EXTENSIONS="${{ inputs.gzip_extensions }}"
+        ASSET_CACHE_CONTROL="${{ inputs.asset_cache_control }}"
+        # rsync cannot store objects with Content-Encoding: gzip (-j is
+        # transport-only), so matching files are re-uploaded with cp -z.
+        # Scoped to subdirectories: root-level files (index, robots.txt,
+        # sitemap.xml, ...) keep the Cache-Control set by their own steps.
+        GSUTIL_HDR=()
+        if [ -n "$ASSET_CACHE_CONTROL" ]; then
+          GSUTIL_HDR=(-h "Cache-Control: ${ASSET_CACHE_CONTROL}")
         fi
-        gsutil "${GSUTIL_HDR[@]}" -m rsync -r -d "${GZIP_FLAG[@]}" -x "$EXCLUDE_PATTERN" "$SOURCE" "gs://${BUCKET}/${DEST_SUFFIX}"
+        shopt -s nullglob
+        DIRS=()
+        for d in "${SOURCE%/}"/*/; do
+          DIRS+=("${d%/}")
+        done
+        if [ ${#DIRS[@]} -eq 0 ]; then
+          echo "::notice::no subdirectories under ${SOURCE} — nothing to compress"
+          exit 0
+        fi
+        gsutil "${GSUTIL_HDR[@]}" -m cp -z "$GZIP_EXTENSIONS" -r "${DIRS[@]}" "gs://${BUCKET}/${DEST_SUFFIX}"
 
     - name: Upload no-cache paths
       if: inputs.no_cache_paths != ''
