@@ -20,6 +20,31 @@ inputs:
     description: Cache-Control for index and fallback
     required: false
     default: 'no-cache, no-store, must-revalidate'
+  gzip_extensions:
+    description: >-
+      Comma-separated file extensions to upload gzip-compressed at rest
+      (gsutil rsync -j, served with Content-Encoding gzip; GCS transcodes for
+      clients that do not accept gzip). Empty disables compression (default,
+      previous behavior). Note gzipped objects re-upload on every sync.
+    required: false
+    default: ''
+  asset_cache_control:
+    description: >-
+      Cache-Control applied to objects uploaded by the sync (use with hashed
+      filenames, e.g. "public, max-age=31536000, immutable"). Only affects
+      objects uploaded in this run; unchanged objects keep their metadata.
+      Empty keeps the bucket default (previous behavior). Unhashed mutable
+      files must be listed in no_cache_paths.
+    required: false
+    default: ''
+  no_cache_paths:
+    description: >-
+      Comma-separated paths (relative to source_dir) re-uploaded with
+      index_cache_control instead of asset_cache_control — for unhashed,
+      mutable files (e.g. sitemap.xml,robots.txt). Missing files are skipped
+      with a notice.
+    required: false
+    default: ''
   fallback_path:
     description: Optional file to re-upload with same Cache-Control (e.g. 404.html)
     required: false
@@ -65,14 +90,55 @@ runs:
         SOURCE="${{ inputs.source_dir }}"
         INDEX_FILE="${{ inputs.index_file }}"
         FALLBACK_PATH="${{ inputs.fallback_path }}"
-        # Escape . for regex and build exclude pattern so index/fallback are only uploaded with no-cache later
+        NO_CACHE_PATHS="${{ inputs.no_cache_paths }}"
+        GZIP_EXTENSIONS="${{ inputs.gzip_extensions }}"
+        ASSET_CACHE_CONTROL="${{ inputs.asset_cache_control }}"
+        # Escape . for regex and build exclude pattern so index/fallback and
+        # no-cache paths are only uploaded with their own Cache-Control later
         INDEX_ESC="${INDEX_FILE//./\\.}"
         EXCLUDE_PATTERN="^${INDEX_ESC}$"
         if [ -n "$FALLBACK_PATH" ]; then
           FALLBACK_ESC="${FALLBACK_PATH//./\\.}"
           EXCLUDE_PATTERN="${EXCLUDE_PATTERN}|^${FALLBACK_ESC}$"
         fi
-        gsutil -m rsync -r -d -x "$EXCLUDE_PATTERN" "$SOURCE" "gs://${BUCKET}/${DEST_SUFFIX}"
+        if [ -n "$NO_CACHE_PATHS" ]; then
+          IFS=',' read -ra NC_PATHS <<< "$NO_CACHE_PATHS"
+          for NC in "${NC_PATHS[@]}"; do
+            NC="$(echo "$NC" | xargs)"
+            [ -z "$NC" ] && continue
+            NC_ESC="${NC//./\\.}"
+            EXCLUDE_PATTERN="${EXCLUDE_PATTERN}|^${NC_ESC}$"
+          done
+        fi
+        GSUTIL_HDR=()
+        if [ -n "$ASSET_CACHE_CONTROL" ]; then
+          GSUTIL_HDR=(-h "Cache-Control: ${ASSET_CACHE_CONTROL}")
+        fi
+        GZIP_FLAG=()
+        if [ -n "$GZIP_EXTENSIONS" ]; then
+          GZIP_FLAG=(-j "$GZIP_EXTENSIONS")
+        fi
+        gsutil "${GSUTIL_HDR[@]}" -m rsync -r -d "${GZIP_FLAG[@]}" -x "$EXCLUDE_PATTERN" "$SOURCE" "gs://${BUCKET}/${DEST_SUFFIX}"
+
+    - name: Upload no-cache paths
+      if: inputs.no_cache_paths != ''
+      shell: bash
+      run: |
+        BUCKET="${{ inputs.bucket }}"
+        DEST_SUFFIX="${{ steps.prefix.outputs.destination }}"
+        SOURCE="${{ inputs.source_dir }}"
+        CACHE_CONTROL="${{ inputs.index_cache_control }}"
+        IFS=',' read -ra NC_PATHS <<< "${{ inputs.no_cache_paths }}"
+        for NC in "${NC_PATHS[@]}"; do
+          NC="$(echo "$NC" | xargs)"
+          [ -z "$NC" ] && continue
+          SOURCE_FILE="${SOURCE%/}/${NC}"
+          if [ ! -f "$SOURCE_FILE" ]; then
+            echo "::notice::no_cache_paths entry not found, skipping: $SOURCE_FILE"
+            continue
+          fi
+          gsutil -h "Cache-Control: ${CACHE_CONTROL}" cp "$SOURCE_FILE" "gs://${BUCKET}/${DEST_SUFFIX}${NC}"
+        done
 
     - name: Upload index with no-cache
       shell: bash
