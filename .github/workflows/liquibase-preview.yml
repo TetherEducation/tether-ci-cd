@@ -121,6 +121,10 @@ jobs:
         id: preview
         run: |
           DB_HOST="${{ steps.db-host.outputs.host }}"
+          # env[0].value del job suele ser la URL JDBC completa (LIQUIBASE_COMMAND_URL),
+          # no solo el host. Extraemos solo el host para no duplicar "jdbc:postgresql://".
+          # Si ya fuera solo un host, el patrón no matchea y queda igual.
+          DB_HOST=$(printf '%s' "$DB_HOST" | sed -E 's#^jdbc:postgresql://([^:/]+).*#\1#')
           JDBC_URL="jdbc:postgresql://${DB_HOST}:5432/$DATABASE_NAME"
 
           gcloud run jobs update "$JOB_NAME" \
